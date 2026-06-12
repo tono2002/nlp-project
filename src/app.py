@@ -103,9 +103,8 @@ def analyze(transcript: str, language: str) -> dict:
     """Send the transcript to Claude and get structured insights back."""
     client = anthropic.Anthropic()
     response = client.messages.create(
-        model="claude-opus-4-8",
-        max_tokens=16000,
-        thinking={"type": "adaptive"},
+        model="claude-haiku-4-5",  # cheapest model — summarization doesn't need more
+        max_tokens=8192,
         system=SYSTEM_PROMPT.format(language=LANGUAGE_NAMES[language]),
         messages=[{"role": "user", "content": f"<transcript>\n{transcript}\n</transcript>"}],
         output_config={"format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},

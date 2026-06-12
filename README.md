@@ -4,6 +4,8 @@ Repository for the **NLP course group assignment**. This is the main project of 
 
 > Core expectation across all options: produce **evidence and analysis that are genuinely our own**, grounded in primary work carried out by the team.
 
+**Team:** Antonio · Martí · Bojana · Smaragda · Jo
+
 ---
 
 ## 1. Project options (choose one)

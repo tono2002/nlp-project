@@ -1,7 +1,8 @@
-"""SummarAI — bilingual (EN/ES) meeting summarizer.
+"""SummarAI — bilingual (EN/ES) meeting summarizer with project management.
 
 Pipeline: audio/video or transcript → Whisper (if audio) → Claude → summary,
 key takeaways, and action items in the user's chosen language.
+Summaries can be saved to projects stored in Supabase.
 """
 
 import json
@@ -10,10 +11,12 @@ import tempfile
 from pathlib import Path
 
 import anthropic
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -23,9 +26,21 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 AUDIO_EXTENSIONS = {".mp4", ".mp3", ".wav", ".m4a", ".webm", ".ogg", ".flac"}
 TEXT_EXTENSIONS = {".txt", ".md", ".vtt", ".srt"}
-MAX_TRANSCRIPT_CHARS = 300_000  # ~75K tokens, well within the context window
+MAX_TRANSCRIPT_CHARS = 300_000
 
 LANGUAGE_NAMES = {"en": "English", "es": "Spanish"}
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ssooqczamcqxpvcpeebv.supabase.co")
+SUPABASE_KEY = os.environ.get(
+    "SUPABASE_ANON_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzb29xY3phbWNxeHB2Y3BlZWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzU0MTEsImV4cCI6MjA5Njg1MTQxMX0.4KbYBc9qY-6Gq_jsdiTWZTdis14xEpPzW0G66qAuq4E",
+)
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+}
 
 OUTPUT_SCHEMA = {
     "type": "object",
@@ -45,14 +60,8 @@ OUTPUT_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "task": {"type": "string"},
-                    "owner": {
-                        "type": ["string", "null"],
-                        "description": "Person responsible, null if not stated.",
-                    },
-                    "deadline": {
-                        "type": ["string", "null"],
-                        "description": "Deadline as stated in the meeting, null if none.",
-                    },
+                    "owner": {"type": ["string", "null"]},
+                    "deadline": {"type": ["string", "null"]},
                 },
                 "required": ["task", "owner", "deadline"],
                 "additionalProperties": False,
@@ -83,7 +92,6 @@ _whisper_model = None
 
 
 def transcribe(path: str) -> str:
-    """Transcribe an audio/video file with local Whisper (lazy-loaded)."""
     global _whisper_model
     try:
         from faster_whisper import WhisperModel
@@ -100,10 +108,9 @@ def transcribe(path: str) -> str:
 
 
 def analyze(transcript: str, language: str) -> dict:
-    """Send the transcript to Claude and get structured insights back."""
     client = anthropic.Anthropic()
     response = client.messages.create(
-        model="claude-haiku-4-5",  # cheapest model — summarization doesn't need more
+        model="claude-haiku-4-5",
         max_tokens=8192,
         system=SYSTEM_PROMPT.format(language=LANGUAGE_NAMES[language]),
         messages=[{"role": "user", "content": f"<transcript>\n{transcript}\n</transcript>"}],
@@ -112,6 +119,17 @@ def analyze(transcript: str, language: str) -> dict:
     text = next(block.text for block in response.content if block.type == "text")
     return json.loads(text)
 
+
+def sb(method: str, path: str, **kwargs):
+    """Thin wrapper for Supabase REST calls."""
+    url = f"{SUPABASE_URL}/rest/v1/{path}"
+    r = httpx.request(method, url, headers=SUPABASE_HEADERS, **kwargs)
+    if r.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase error: {r.text}")
+    return r.json()
+
+
+# ── Main processing endpoint ──────────────────────────────────────────────────
 
 @app.get("/")
 def index():
@@ -169,6 +187,63 @@ async def process(file: UploadFile = File(...), language: str = Form("en")):
 
     result["transcript_chars"] = len(transcript)
     return result
+
+
+# ── Projects ──────────────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: str = ""
+
+
+@app.get("/api/projects")
+def list_projects():
+    return sb("GET", "projects?select=*&order=created_at.desc")
+
+
+@app.post("/api/projects")
+def create_project(body: ProjectCreate):
+    rows = sb("POST", "projects", json={"name": body.name, "description": body.description})
+    return rows[0] if isinstance(rows, list) else rows
+
+
+@app.delete("/api/projects/{project_id}")
+def delete_project(project_id: str):
+    sb("DELETE", f"projects?id=eq.{project_id}")
+    return {"ok": True}
+
+
+# ── Summarizations ────────────────────────────────────────────────────────────
+
+class SummarizationSave(BaseModel):
+    project_id: str
+    meeting_title: str
+    language: str
+    detected_language: str
+    transcript_chars: int
+    summary: str
+    key_takeaways: list
+    action_items: list
+
+
+@app.get("/api/projects/{project_id}/summarizations")
+def list_summarizations(project_id: str):
+    return sb("GET", f"summarizations?project_id=eq.{project_id}&order=created_at.desc")
+
+
+@app.post("/api/summarizations")
+def save_summarization(body: SummarizationSave):
+    payload = body.model_dump()
+    payload["key_takeaways"] = json.dumps(payload["key_takeaways"])
+    payload["action_items"] = json.dumps(payload["action_items"])
+    rows = sb("POST", "summarizations", json=payload)
+    return rows[0] if isinstance(rows, list) else rows
+
+
+@app.delete("/api/summarizations/{summ_id}")
+def delete_summarization(summ_id: str):
+    sb("DELETE", f"summarizations?id=eq.{summ_id}")
+    return {"ok": True}
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

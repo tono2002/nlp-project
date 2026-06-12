@@ -287,23 +287,51 @@
   .back-btn:hover { border-color: var(--glow); color: var(--text); }
   .project-view-title { font-size: 1.4rem; font-weight: 700; }
   .project-view-desc { color: var(--text-dim); font-size: .9rem; margin-top: 4px; }
-  .summ-list { margin-top: 8px; }
-  .summ-card {
-    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
-    padding: 18px 20px; margin-bottom: 14px; cursor: pointer;
-    transition: border-color .2s, background .2s;
+  /* ── Timeline ── */
+  .timeline { margin-top: 8px; padding-left: 20px; }
+  .tl-group { margin-bottom: 32px; }
+  .tl-month {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--glow); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
   }
-  .summ-card:hover { border-color: rgba(129,140,248,.4); background: rgba(99,102,241,.1); }
-  .summ-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-  .summ-card-title { font-weight: 600; font-size: .95rem; }
-  .summ-card-meta { color: var(--text-dim); font-size: .78rem; margin-top: 4px; }
-  .summ-card-del {
-    background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: .8rem;
-    padding: 2px 6px; border-radius: 4px; flex: none; transition: color .15s;
+  .tl-month::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--card-border), transparent); }
+
+  .tl-item {
+    display: flex; gap: 16px; margin-bottom: 14px;
+    opacity: 0; transform: translateX(-12px);
+    animation: tl-in .4s ease forwards;
   }
-  .summ-card-del:hover { color: var(--danger); }
-  .summ-card-preview { color: var(--text-dim); font-size: .85rem; margin-top: 10px; line-height: 1.5;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  @keyframes tl-in { to { opacity: 1; transform: none; } }
+
+  .tl-left { display: flex; flex-direction: column; align-items: center; flex: none; width: 36px; }
+  .tl-dot {
+    width: 12px; height: 12px; border-radius: 50%; flex: none;
+    background: linear-gradient(135deg, var(--indigo), var(--violet));
+    box-shadow: 0 0 10px rgba(99,102,241,.5);
+    margin-top: 4px;
+  }
+  .tl-line { flex: 1; width: 2px; background: linear-gradient(to bottom, rgba(99,102,241,.3), transparent); margin-top: 4px; min-height: 20px; }
+
+  .tl-card {
+    flex: 1; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
+    padding: 14px 18px; cursor: pointer; transition: border-color .2s, background .2s, transform .2s;
+    margin-bottom: 2px;
+  }
+  .tl-card:hover { border-color: rgba(129,140,248,.4); background: rgba(99,102,241,.1); transform: translateX(3px); }
+  .tl-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .tl-card-title { font-weight: 600; font-size: .92rem; }
+  .tl-card-date { color: var(--text-dim); font-size: .75rem; white-space: nowrap; }
+  .tl-card-del {
+    background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: .78rem;
+    padding: 2px 5px; border-radius: 4px; flex: none; opacity: 0; transition: opacity .15s, color .15s;
+  }
+  .tl-card:hover .tl-card-del { opacity: 1; }
+  .tl-card-del:hover { color: var(--danger); }
+  .tl-card-meta { color: var(--text-dim); font-size: .76rem; margin-top: 3px; }
+  .tl-card-preview {
+    color: var(--text-dim); font-size: .84rem; margin-top: 9px; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
   .summ-empty { color: var(--text-dim); font-size: .88rem; text-align: center; padding: 32px 0; }
 
   /* summ detail modal */
@@ -446,7 +474,7 @@
           <div class="project-view-desc" id="pv-desc"></div>
         </div>
       </div>
-      <div class="summ-list" id="summ-list"></div>
+      <div class="timeline" id="summ-list"></div>
     </div>
 
   </div>
@@ -596,19 +624,43 @@ async function loadSummarizations(projectId) {
     list.innerHTML = `<p class="summ-empty">${I18N[lang].noSumm}</p>`;
     return;
   }
-  list.innerHTML = summs.map(s => `
-    <div class="summ-card" data-id="${s.id}">
-      <div class="summ-card-header">
-        <div>
-          <div class="summ-card-title">${escHtml(s.meeting_title)}</div>
-          <div class="summ-card-meta">${new Date(s.created_at).toLocaleString()} · ${s.transcript_chars?.toLocaleString() ?? "?"} chars · ${s.language?.toUpperCase()}</div>
-        </div>
-        <button class="summ-card-del" data-del="${s.id}">✕</button>
-      </div>
-      <div class="summ-card-preview">${escHtml(s.summary)}</div>
+
+  // Group by month
+  const groups = {};
+  summs.forEach(s => {
+    const d = new Date(s.created_at);
+    const key = d.toLocaleString("en", { month: "long", year: "numeric" });
+    (groups[key] = groups[key] || []).push(s);
+  });
+
+  list.innerHTML = Object.entries(groups).map(([month, items], gi) => `
+    <div class="tl-group">
+      <div class="tl-month">${month}</div>
+      ${items.map((s, i) => {
+        const d = new Date(s.created_at);
+        const isLast = i === items.length - 1;
+        return `
+        <div class="tl-item" style="animation-delay:${(gi * items.length + i) * 0.07}s" data-id="${s.id}">
+          <div class="tl-left">
+            <div class="tl-dot"></div>
+            ${!isLast ? '<div class="tl-line"></div>' : ""}
+          </div>
+          <div class="tl-card" data-id="${s.id}">
+            <div class="tl-card-header">
+              <div class="tl-card-title">${escHtml(s.meeting_title)}</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="tl-card-date">${d.toLocaleDateString("en", {day:"numeric",month:"short"})}</span>
+                <button class="tl-card-del" data-del="${s.id}">✕</button>
+              </div>
+            </div>
+            <div class="tl-card-meta">${d.toLocaleTimeString("en",{hour:"2-digit",minute:"2-digit"})} · ${s.transcript_chars?.toLocaleString() ?? "?"} chars · ${s.language?.toUpperCase()}</div>
+            <div class="tl-card-preview">${escHtml(s.summary)}</div>
+          </div>
+        </div>`;
+      }).join("")}
     </div>`).join("");
 
-  list.querySelectorAll(".summ-card").forEach(card => {
+  list.querySelectorAll(".tl-card").forEach(card => {
     card.addEventListener("click", (e) => {
       if (e.target.closest("[data-del]")) return;
       const s = summs.find(x => x.id === card.dataset.id);
@@ -616,7 +668,8 @@ async function loadSummarizations(projectId) {
     });
   });
   list.querySelectorAll("[data-del]").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       await fetch(`/api/summarizations/${btn.dataset.del}`, { method: "DELETE" });
       await loadSummarizations(projectId);
     });

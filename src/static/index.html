@@ -184,31 +184,46 @@
 
   .results { display: none; margin-top: 44px; }
 
-  /* save to project bar */
-  .save-bar {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
-    padding: 14px 18px; margin-bottom: 22px;
+  /* pre-summarize project picker */
+  .project-picker {
+    display: none; margin-top: 20px;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
+    padding: 18px 20px;
   }
-  .save-bar label { color: var(--text-dim); font-size: .88rem; flex: none; }
-  .save-bar input {
-    flex: 1; min-width: 160px; background: rgba(10,10,31,.6); border: 1px solid var(--card-border);
-    border-radius: 8px; color: var(--text); font: inherit; font-size: .88rem; padding: 7px 10px;
+  .project-picker-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
   }
-  .save-bar input:focus { outline: none; border-color: var(--indigo-bright); }
-  .save-bar select {
-    flex: 1; min-width: 140px; background: rgba(10,10,31,.85); border: 1px solid var(--card-border);
-    border-radius: 8px; color: var(--text); font: inherit; font-size: .88rem; padding: 7px 10px;
-    cursor: pointer;
+  .project-picker-header span { font-size: .82rem; color: var(--text-dim); flex: 1; }
+  .toggle-save {
+    position: relative; width: 38px; height: 22px; flex: none;
   }
-  .btn-save {
-    padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer; font: inherit;
-    font-size: .88rem; font-weight: 600; color: #fff;
-    background: linear-gradient(135deg, var(--indigo), var(--violet));
-    transition: opacity .2s;
+  .toggle-save input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0; background: rgba(129,140,248,.2);
+    border-radius: 999px; border: 1px solid var(--card-border);
+    cursor: pointer; transition: background .2s;
   }
-  .btn-save:disabled { opacity: .4; cursor: not-allowed; }
-  .save-ok { color: var(--ok); font-size: .85rem; display: none; }
+  .toggle-track::after {
+    content: ""; position: absolute; left: 3px; top: 3px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--text-dim); transition: all .2s;
+  }
+  .toggle-save input:checked ~ .toggle-track { background: var(--indigo); border-color: var(--indigo); }
+  .toggle-save input:checked ~ .toggle-track::after { transform: translateX(16px); background: #fff; }
+
+  .project-picker-fields {
+    display: none; flex-direction: column; gap: 10px;
+  }
+  .project-picker-fields.visible { display: flex; }
+  .project-picker-fields input,
+  .project-picker-fields select {
+    width: 100%; background: rgba(10,10,31,.6); border: 1px solid var(--card-border);
+    border-radius: 8px; color: var(--text); font: inherit; font-size: .88rem; padding: 9px 12px;
+  }
+  .project-picker-fields input:focus,
+  .project-picker-fields select:focus { outline: none; border-color: var(--indigo-bright); }
+  .project-picker-fields select { background-color: rgba(10,10,31,.85); cursor: pointer; }
+  .save-ok { color: var(--ok); font-size: .82rem; margin-top: 6px; display: none; text-align: center; }
 
   .card {
     background: var(--card); border: 1px solid var(--card-border); border-radius: 18px;
@@ -216,8 +231,8 @@
     opacity: 0; transform: translateY(18px);
     animation: rise .55s cubic-bezier(.2,.7,.3,1) forwards;
   }
-  .card:nth-child(3) { animation-delay: .12s; }
-  .card:nth-child(4) { animation-delay: .24s; }
+  .card:nth-child(2) { animation-delay: .12s; }
+  .card:nth-child(3) { animation-delay: .24s; }
   @keyframes rise { to { opacity: 1; transform: none; } }
   .card h2 {
     font-size: .82rem; text-transform: uppercase; letter-spacing: .14em;
@@ -377,6 +392,24 @@
         <input type="file" id="file-input" accept=".mp4,.mp3,.wav,.m4a,.webm,.ogg,.flac,.txt,.md,.vtt,.srt">
       </div>
 
+      <!-- Project picker — shown after file is selected -->
+      <div class="project-picker" id="project-picker">
+        <div class="project-picker-header">
+          <span data-en="Save this meeting to a project? (optional)" data-es="Save this meeting to a project? (optional)">Save this meeting to a project? (optional)</span>
+          <label class="toggle-save">
+            <input type="checkbox" id="toggle-save-cb">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="project-picker-fields" id="picker-fields">
+          <input type="text" id="meeting-title" placeholder="Meeting title…" maxlength="120">
+          <select id="project-select">
+            <option value="">— select project —</option>
+          </select>
+        </div>
+        <div class="save-ok" id="save-ok">✓ Saved to project!</div>
+      </div>
+
       <button class="go" id="go" disabled data-en="✦ Summarize" data-es="✦ Resumir">✦ Summarize</button>
 
       <div class="processing" id="processing">
@@ -388,17 +421,6 @@
       <button class="again" id="again" data-en="↺ Analyze another meeting" data-es="↺ Analizar otra reunión">↺ Analyze another meeting</button>
 
       <div class="results" id="results">
-        <!-- Save to project bar -->
-        <div class="save-bar">
-          <label data-en="Save to project:" data-es="Guardar en proyecto:">Save to project:</label>
-          <input type="text" id="meeting-title" data-en="Meeting title…" data-es="Título de la reunión…" placeholder="Meeting title…">
-          <select id="project-select">
-            <option value="">— select project —</option>
-          </select>
-          <button class="btn-save" id="btn-save" disabled data-en="Save" data-es="Guardar">Save</button>
-          <span class="save-ok" id="save-ok">✓ Saved!</span>
-        </div>
-
         <div class="card">
           <h2 data-en="Summary" data-es="Resumen">Summary</h2>
           <p id="summary"></p>
@@ -518,7 +540,6 @@ function populateProjectSelect() {
   const cur = sel.value;
   sel.innerHTML = '<option value="">— select project —</option>' +
     projects.map(p => `<option value="${p.id}"${p.id===cur?" selected":""}>${escHtml(p.name)}</option>`).join("");
-  updateSaveBtn();
 }
 
 // new project form
@@ -633,6 +654,11 @@ function openModal(s) {
 $("modal-close").onclick = () => $("modal-overlay").classList.remove("open");
 $("modal-overlay").addEventListener("click", (e) => { if (e.target === $("modal-overlay")) $("modal-overlay").classList.remove("open"); });
 
+// ── Project picker (pre-summarize) ────────────────────────────────────────────
+$("toggle-save-cb").onchange = function () {
+  $("picker-fields").classList.toggle("visible", this.checked);
+};
+
 // ── File drop / upload ────────────────────────────────────────────────────────
 const dropzone = $("dropzone"), input = $("file-input"), chip = $("file-chip"),
       go = $("go"), processing = $("processing"), results = $("results"),
@@ -643,6 +669,7 @@ function setFile(f) {
   chip.textContent = `📄 ${f.name}`;
   chip.style.display = "block";
   go.disabled = false;
+  $("project-picker").style.display = "block";
 }
 dropzone.onclick = () => input.click();
 input.onchange = () => input.files[0] && setFile(input.files[0]);
@@ -681,6 +708,7 @@ go.onclick = async () => {
     if (!res.ok) throw new Error(data.detail || "Something went wrong.");
     lastResult = data;
     render(data);
+    await autoSave(data);
   } catch (e) {
     errBox.textContent = "⚠ " + e.message;
     errBox.style.display = "block";
@@ -697,28 +725,24 @@ again.onclick = () => {
   errBox.style.display = "none";
   again.style.display = "none";
   chip.style.display = "none";
+  $("project-picker").style.display = "none";
+  $("toggle-save-cb").checked = false;
+  $("picker-fields").classList.remove("visible");
+  $("meeting-title").value = "";
+  $("save-ok").style.display = "none";
   file = null; input.value = "";
   go.disabled = true;
   lastResult = null;
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
-// ── Save to project ───────────────────────────────────────────────────────────
-function updateSaveBtn() {
-  const hasTitle = $("meeting-title").value.trim().length > 0;
-  const hasProject = $("project-select").value !== "";
-  $("btn-save").disabled = !(hasTitle && hasProject && lastResult);
-}
-$("meeting-title").oninput = updateSaveBtn;
-$("project-select").onchange = updateSaveBtn;
-
-$("btn-save").onclick = async () => {
-  if (!lastResult) return;
+// ── Auto-save after processing ────────────────────────────────────────────────
+async function autoSave(data) {
+  if (!$("toggle-save-cb").checked) return;
   const title = $("meeting-title").value.trim();
   const projectId = $("project-select").value;
   if (!title || !projectId) return;
 
-  $("btn-save").disabled = true;
   try {
     await fetch("/api/summarizations", {
       method: "POST",
@@ -727,21 +751,18 @@ $("btn-save").onclick = async () => {
         project_id: projectId,
         meeting_title: title,
         language: lang,
-        detected_language: lastResult.detected_language,
-        transcript_chars: lastResult.transcript_chars,
-        summary: lastResult.summary,
-        key_takeaways: lastResult.key_takeaways,
-        action_items: lastResult.action_items,
+        detected_language: data.detected_language,
+        transcript_chars: data.transcript_chars,
+        summary: data.summary,
+        key_takeaways: data.key_takeaways,
+        action_items: data.action_items,
       }),
     });
-    $("save-ok").style.display = "inline";
-    setTimeout(() => { $("save-ok").style.display = "none"; }, 3000);
+    $("save-ok").style.display = "block";
   } catch {
-    alert("Error saving. Try again.");
-  } finally {
-    updateSaveBtn();
+    /* silent — don't block the user from seeing results */
   }
-};
+}
 
 // ── Render results ────────────────────────────────────────────────────────────
 function render(data) {

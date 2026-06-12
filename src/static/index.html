@@ -123,20 +123,6 @@
   @keyframes shine { to { background-position: 200% center; } }
   .tagline { color: var(--text-dim); margin-top: 10px; font-size: 1.05rem; }
 
-  .lang-row { display: flex; justify-content: center; gap: 0; margin-bottom: 28px; }
-  .lang-toggle {
-    display: inline-flex; background: rgba(10,10,31,.6); border: 1px solid var(--card-border);
-    border-radius: 999px; padding: 4px; backdrop-filter: blur(10px);
-  }
-  .lang-toggle button {
-    border: 0; background: transparent; color: var(--text-dim); font: inherit;
-    padding: 8px 22px; border-radius: 999px; cursor: pointer; transition: all .25s ease;
-  }
-  .lang-toggle button.active {
-    background: linear-gradient(135deg, var(--indigo), var(--violet));
-    color: #fff; box-shadow: 0 0 18px rgba(99,102,241,.5);
-  }
-
   .dropzone {
     position: relative;
     border: 1.5px dashed rgba(129,140,248,.35);
@@ -249,6 +235,26 @@
   .card ul li::before {
     content: "◆"; position: absolute; left: 2px; color: var(--violet); font-size: .7rem; top: 13px;
   }
+
+  /* takeaway bubbles */
+  .takeaways { display: flex; flex-direction: column; gap: 8px; }
+  .takeaway {
+    display: flex; align-items: flex-start; gap: 11px;
+    padding: 10px 14px; border-radius: 12px; line-height: 1.4; font-size: .94rem;
+    border: 1px solid var(--card-border); border-left-width: 3px;
+    opacity: 0; transform: translateX(-8px);
+    animation: slidein .4s ease forwards;
+  }
+  @keyframes slidein { to { opacity: 1; transform: none; } }
+  .takeaway .tk-tag {
+    flex: none; font-size: .6rem; font-weight: 800; letter-spacing: .07em;
+    text-transform: uppercase; padding: 3px 9px; border-radius: 999px; margin-top: 1px;
+  }
+  .takeaway .tk-text { flex: 1; color: var(--text); }
+  .takeaway.decision { border-left-color: var(--ok); background: rgba(52,211,153,.07); }
+  .takeaway.decision .tk-tag { background: rgba(52,211,153,.18); color: #6ee7b7; }
+  .takeaway.note { border-left-color: var(--violet); background: rgba(139,92,246,.07); }
+  .takeaway.note .tk-tag { background: rgba(139,92,246,.18); color: #c4b5fd; }
 
   .action { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(129,140,248,.08); }
   .action:last-child { border-bottom: 0; }
@@ -396,26 +402,13 @@
     <div id="summarizer-view">
       <header>
         <div class="logo">SummarAI</div>
-        <p class="tagline" data-en="Turn meetings into summaries, takeaways and action items — in your language."
-                           data-es="Convierte reuniones en resúmenes, puntos clave y tareas — en tu idioma.">
-          Turn meetings into summaries, takeaways and action items — in your language.</p>
+        <p class="tagline">Turn any meeting into a crisp summary, scannable takeaways, and action items.</p>
       </header>
-
-      <div class="lang-row">
-        <div class="lang-toggle">
-          <button id="lang-en" class="active">🇬🇧 English</button>
-          <button id="lang-es">🇪🇸 Español</button>
-        </div>
-      </div>
 
       <div class="dropzone" id="dropzone">
         <span class="icon">🎙️</span>
-        <div data-en="Drop your meeting here or <strong>browse</strong>"
-             data-es="Arrastra tu reunión aquí o <strong>busca un archivo</strong>">
-             Drop your meeting here or <strong>browse</strong></div>
-        <div class="hint" data-en="mp4 · mp3 · wav · m4a · txt — audio is transcribed automatically"
-                          data-es="mp4 · mp3 · wav · m4a · txt — el audio se transcribe automáticamente">
-             mp4 · mp3 · wav · m4a · txt — audio is transcribed automatically</div>
+        <div>Drop your meeting here or <strong>browse</strong></div>
+        <div class="hint">mp4 · mp3 · wav · m4a · txt — audio is transcribed automatically</div>
         <div class="file-chip" id="file-chip"></div>
         <input type="file" id="file-input" accept=".mp4,.mp3,.wav,.m4a,.webm,.ogg,.flac,.txt,.md,.vtt,.srt">
       </div>
@@ -423,7 +416,7 @@
       <!-- Project picker — shown after file is selected -->
       <div class="project-picker" id="project-picker">
         <div class="project-picker-header">
-          <span data-en="Save this meeting to a project? (optional)" data-es="Save this meeting to a project? (optional)">Save this meeting to a project? (optional)</span>
+          <span>Save this meeting to a project? (optional)</span>
           <label class="toggle-save">
             <input type="checkbox" id="toggle-save-cb">
             <span class="toggle-track"></span>
@@ -438,7 +431,7 @@
         <div class="save-ok" id="save-ok">✓ Saved to project!</div>
       </div>
 
-      <button class="go" id="go" disabled data-en="✦ Summarize" data-es="✦ Resumir">✦ Summarize</button>
+      <button class="go" id="go" disabled>✦ Summarize</button>
 
       <div class="processing" id="processing">
         <div class="bar"><i></i></div>
@@ -446,19 +439,19 @@
       </div>
 
       <div class="error" id="error"></div>
-      <button class="again" id="again" data-en="↺ Analyze another meeting" data-es="↺ Analizar otra reunión">↺ Analyze another meeting</button>
+      <button class="again" id="again">↺ Analyze another meeting</button>
 
       <div class="results" id="results">
         <div class="card">
-          <h2 data-en="Summary" data-es="Resumen">Summary</h2>
+          <h2>Summary</h2>
           <p id="summary"></p>
         </div>
         <div class="card">
-          <h2 data-en="Key takeaways" data-es="Puntos clave">Key takeaways</h2>
-          <ul id="takeaways"></ul>
+          <h2>Key takeaways</h2>
+          <div id="takeaways" class="takeaways"></div>
         </div>
         <div class="card">
-          <h2 data-en="Action items" data-es="Tareas pendientes">Action items</h2>
+          <h2>Action items</h2>
           <div id="actions"></div>
         </div>
         <p class="meta" id="meta"></p>
@@ -487,48 +480,43 @@
     <h1 id="modal-title"></h1>
     <div class="modal-meta" id="modal-meta"></div>
     <div class="modal-section">
-      <h2 data-en="Summary" data-es="Resumen">Summary</h2>
+      <h2>Summary</h2>
       <p id="modal-summary"></p>
     </div>
     <div class="modal-section">
-      <h2 data-en="Key takeaways" data-es="Puntos clave">Key takeaways</h2>
-      <ul id="modal-takeaways"></ul>
+      <h2>Key takeaways</h2>
+      <div id="modal-takeaways" class="takeaways"></div>
     </div>
     <div class="modal-section">
-      <h2 data-en="Action items" data-es="Tareas pendientes">Action items</h2>
+      <h2>Action items</h2>
       <div id="modal-actions"></div>
     </div>
   </div>
 </div>
 
 <script>
-const I18N = {
-  en: { stages: ["Reading your file…","Transcribing audio…","Understanding the meeting…","Extracting action items…"],
-        none: "No clear action items were found in this meeting.", chars: "transcript characters analyzed",
-        noSumm: "No summarizations yet. Process a meeting and save it to this project." },
-  es: { stages: ["Leyendo tu archivo…","Transcribiendo el audio…","Entendiendo la reunión…","Extrayendo las tareas…"],
-        none: "No se encontraron tareas claras en esta reunión.", chars: "caracteres analizados",
-        noSumm: "Sin resúmenes aún. Procesa una reunión y guárdala en este proyecto." },
+const T = {
+  stages: ["Reading your file…", "Transcribing audio…", "Understanding the meeting…", "Extracting action items…"],
+  none: "No clear action items were found in this meeting.",
+  chars: "transcript characters analyzed",
+  noSumm: "No summarizations yet. Process a meeting and save it to this project.",
 };
 
-let lang = "en";
+// Render one key-takeaway bubble. Accepts {text, type}; tolerates legacy plain strings.
+function takeawayHTML(t, i = 0) {
+  const text = (typeof t === "string") ? t : t.text;
+  const type = (typeof t === "object" && t && t.type === "decision") ? "decision" : "note";
+  const tag = type === "decision" ? "Decision" : "Note";
+  const delay = i ? ` style="animation-delay:${i * 60}ms"` : "";
+  return `<div class="takeaway ${type}"${delay}><span class="tk-tag">${tag}</span><span class="tk-text">${escHtml(text)}</span></div>`;
+}
+
 let file = null;
 let lastResult = null;
 let projects = [];
 let activeProjectId = null;
 
 const $ = (id) => document.getElementById(id);
-
-// ── Language ──────────────────────────────────────────────────────────────────
-function setLang(next) {
-  lang = next;
-  $("lang-en").classList.toggle("active", next === "en");
-  $("lang-es").classList.toggle("active", next === "es");
-  document.querySelectorAll("[data-en]").forEach((el) => { el.innerHTML = el.dataset[next] || el.dataset.en; });
-  $("meeting-title").placeholder = next === "es" ? "Título de la reunión…" : "Meeting title…";
-}
-$("lang-en").onclick = () => setLang("en");
-$("lang-es").onclick = () => setLang("es");
 
 // ── Projects sidebar ──────────────────────────────────────────────────────────
 async function loadProjects() {
@@ -621,10 +609,9 @@ async function loadSummarizations(projectId) {
   const res = await fetch(`/api/projects/${projectId}/summarizations`);
   const summs = await res.json();
   if (!summs.length) {
-    list.innerHTML = `<p class="summ-empty">${I18N[lang].noSumm}</p>`;
+    list.innerHTML = `<p class="summ-empty">${T.noSumm}</p>`;
     return;
   }
-
   // Group by month
   const groups = {};
   summs.forEach(s => {
@@ -653,7 +640,7 @@ async function loadSummarizations(projectId) {
                 <button class="tl-card-del" data-del="${s.id}">✕</button>
               </div>
             </div>
-            <div class="tl-card-meta">${d.toLocaleTimeString("en",{hour:"2-digit",minute:"2-digit"})} · ${s.transcript_chars?.toLocaleString() ?? "?"} chars · ${s.language?.toUpperCase()}</div>
+            <div class="tl-card-meta">${d.toLocaleTimeString("en",{hour:"2-digit",minute:"2-digit"})} · ${s.transcript_chars?.toLocaleString() ?? "?"} chars</div>
             <div class="tl-card-preview">${escHtml(s.summary)}</div>
           </div>
         </div>`;
@@ -679,15 +666,15 @@ async function loadSummarizations(projectId) {
 // ── Modal ─────────────────────────────────────────────────────────────────────
 function openModal(s) {
   $("modal-title").textContent = s.meeting_title;
-  $("modal-meta").textContent = `${new Date(s.created_at).toLocaleString()} · ${s.transcript_chars?.toLocaleString() ?? "?"} chars · ${s.language?.toUpperCase()} · detected: ${s.detected_language}`;
+  $("modal-meta").textContent = `${new Date(s.created_at).toLocaleString()} · ${s.transcript_chars?.toLocaleString() ?? "?"} chars`;
   $("modal-summary").textContent = s.summary;
 
   const takeaways = typeof s.key_takeaways === "string" ? JSON.parse(s.key_takeaways) : s.key_takeaways;
-  $("modal-takeaways").innerHTML = takeaways.map(t => `<li>${escHtml(t)}</li>`).join("");
+  $("modal-takeaways").innerHTML = takeaways.map((t, i) => takeawayHTML(t, i)).join("");
 
   const actions = typeof s.action_items === "string" ? JSON.parse(s.action_items) : s.action_items;
   if (!actions.length) {
-    $("modal-actions").innerHTML = `<p style="color:var(--text-dim)">${I18N[lang].none}</p>`;
+    $("modal-actions").innerHTML = `<p style="color:var(--text-dim)">${T.none}</p>`;
   } else {
     $("modal-actions").innerHTML = actions.map(a => `
       <div class="action">
@@ -732,7 +719,7 @@ dropzone.addEventListener("drop", e => e.dataTransfer.files[0] && setFile(e.data
 
 let stageTimer = null;
 function startStages() {
-  const stages = I18N[lang].stages;
+  const stages = T.stages;
   let i = 0;
   $("processing-text").textContent = stages[0];
   stageTimer = setInterval(() => {
@@ -753,7 +740,6 @@ go.onclick = async () => {
 
   const form = new FormData();
   form.append("file", file);
-  form.append("language", lang);
 
   try {
     const res = await fetch("/api/process", { method: "POST", body: form });
@@ -803,8 +789,8 @@ async function autoSave(data) {
       body: JSON.stringify({
         project_id: projectId,
         meeting_title: title,
-        language: lang,
-        detected_language: data.detected_language,
+        language: "en",
+        detected_language: "en",
         transcript_chars: data.transcript_chars,
         summary: data.summary,
         key_takeaways: data.key_takeaways,
@@ -821,18 +807,12 @@ async function autoSave(data) {
 function render(data) {
   $("summary").textContent = data.summary;
 
-  const takeaways = $("takeaways");
-  takeaways.innerHTML = "";
-  data.key_takeaways.forEach(t => {
-    const li = document.createElement("li");
-    li.textContent = t;
-    takeaways.appendChild(li);
-  });
+  $("takeaways").innerHTML = data.key_takeaways.map((t, i) => takeawayHTML(t, i)).join("");
 
   const actionsEl = $("actions");
   actionsEl.innerHTML = "";
   if (!data.action_items.length) {
-    actionsEl.innerHTML = `<p style="color:var(--text-dim)">${I18N[lang].none}</p>`;
+    actionsEl.innerHTML = `<p style="color:var(--text-dim)">${T.none}</p>`;
   }
   data.action_items.forEach(a => {
     const row = document.createElement("div");
@@ -849,7 +829,7 @@ function render(data) {
     actionsEl.appendChild(row);
   });
 
-  $("meta").textContent = `${data.transcript_chars.toLocaleString()} ${I18N[lang].chars}`;
+  $("meta").textContent = `${data.transcript_chars.toLocaleString()} ${T.chars}`;
 
   results.querySelectorAll(".card").forEach(c => {
     c.style.animation = "none"; void c.offsetWidth; c.style.animation = "";

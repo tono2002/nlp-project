@@ -1,7 +1,7 @@
-"""SummarAI — bilingual (EN/ES) meeting summarizer with project management.
+"""SummarAI — English meeting summarizer with project management.
 
-Pipeline: audio/video or transcript → Whisper (if audio) → Claude → summary,
-key takeaways, and action items in the user's chosen language.
+Pipeline: audio/video or transcript → Whisper (if audio) → Claude → a 2-sentence
+summary, typed key-takeaway bullets (decision / note), and action items.
 Summaries can be saved to projects stored in Supabase.
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 import anthropic
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -28,9 +28,7 @@ AUDIO_EXTENSIONS = {".mp4", ".mp3", ".wav", ".m4a", ".webm", ".ogg", ".flac"}
 TEXT_EXTENSIONS = {".txt", ".md", ".vtt", ".srt"}
 MAX_TRANSCRIPT_CHARS = 300_000
 
-LANGUAGE_NAMES = {"en": "English", "es": "Spanish"}
-
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ssooqczamcqxpvcpeebv.supabase.co")
+SUPABASE_URL =os.environ.get("SUPABASE_URL", "https://ssooqczamcqxpvcpeebv.supabase.co")
 SUPABASE_KEY = os.environ.get(
     "SUPABASE_ANON_KEY",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzb29xY3phbWNxeHB2Y3BlZWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzU0MTEsImV4cCI6MjA5Njg1MTQxMX0.4KbYBc9qY-6Gq_jsdiTWZTdis14xEpPzW0G66qAuq4E",
@@ -47,12 +45,27 @@ OUTPUT_SCHEMA = {
     "properties": {
         "summary": {
             "type": "string",
-            "description": "Concise summary of the meeting (2-4 paragraphs).",
+            "description": "At most 2 short sentences: the meeting's purpose and overall outcome.",
         },
         "key_takeaways": {
             "type": "array",
-            "items": {"type": "string"},
-            "description": "The main points and decisions, one per item.",
+            "description": "Every important point from the transcript as short, scannable bullets. Lose no information.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Brief, punchy bullet (ideally under 14 words). No filler.",
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["decision", "note"],
+                        "description": "'decision' if agreed/decided/set as a target or policy; otherwise 'note'.",
+                    },
+                },
+                "required": ["text", "type"],
+                "additionalProperties": False,
+            },
         },
         "action_items": {
             "type": "array",
@@ -67,26 +80,32 @@ OUTPUT_SCHEMA = {
                 "additionalProperties": False,
             },
         },
-        "detected_language": {
-            "type": "string",
-            "description": "Main language of the source transcript.",
-        },
     },
-    "required": ["summary", "key_takeaways", "action_items", "detected_language"],
+    "required": ["summary", "key_takeaways", "action_items"],
     "additionalProperties": False,
 }
 
 SYSTEM_PROMPT = """\
-You are SummarAI, an expert meeting analyst. You receive a raw meeting \
-transcript (possibly noisy, unpunctuated, or mixing languages) and produce:
-1. A concise summary capturing purpose, discussion, and outcomes.
-2. Key takeaways: the decisions and main points, each standing on its own.
-3. Action items: concrete tasks someone committed to. Extract the owner and \
-deadline only when actually stated — never invent them. Do not list vague \
-intentions ("we should think about X") as action items.
+You are SummarAI, an expert meeting analyst. From a raw meeting transcript \
+(possibly noisy or unpunctuated) produce three things:
 
-Write ALL output in {language}, regardless of the transcript's language. \
-Keep proper names, product names, and quoted terms in their original form."""
+1. summary — AT MOST 2 short sentences. State only the meeting's purpose and \
+its overall outcome. Nothing else goes here.
+
+2. key_takeaways — the real substance of the meeting as short, scannable \
+bullets. Be COMPREHENSIVE: every important fact, figure, result, risk, or \
+point raised must appear here. Lose no information — the 2-sentence summary \
+deliberately omits detail, so the takeaways must carry all of it. Keep each \
+bullet brief and telegraphic (ideally under 14 words), no filler words. Tag \
+each bullet:
+   - "decision" — something agreed, decided, or set as a target or policy.
+   - "note" — any other important point, fact, number, result, or concern.
+
+3. action_items — concrete tasks someone committed to. Give owner and \
+deadline ONLY when actually stated; never invent them. Skip vague intentions.
+
+Write everything in English. Keep proper names, product names, and figures \
+exact."""
 
 _whisper_model = None
 
@@ -107,12 +126,12 @@ def transcribe(path: str) -> str:
     return " ".join(segment.text.strip() for segment in segments)
 
 
-def analyze(transcript: str, language: str) -> dict:
+def analyze(transcript: str) -> dict:
     client = anthropic.Anthropic()
     response = client.messages.create(
         model="claude-haiku-4-5",
         max_tokens=8192,
-        system=SYSTEM_PROMPT.format(language=LANGUAGE_NAMES[language]),
+        system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"<transcript>\n{transcript}\n</transcript>"}],
         output_config={"format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},
     )
@@ -137,9 +156,7 @@ def index():
 
 
 @app.post("/api/process")
-async def process(file: UploadFile = File(...), language: str = Form("en")):
-    if language not in LANGUAGE_NAMES:
-        raise HTTPException(status_code=400, detail="Language must be 'en' or 'es'.")
+async def process(file: UploadFile = File(...)):
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise HTTPException(
             status_code=500,
@@ -177,7 +194,7 @@ async def process(file: UploadFile = File(...), language: str = Form("en")):
         )
 
     try:
-        result = analyze(transcript, language)
+        result = analyze(transcript)
     except anthropic.AuthenticationError:
         raise HTTPException(status_code=500, detail="Invalid Anthropic API key.")
     except anthropic.APIError as exc:
@@ -218,8 +235,8 @@ def delete_project(project_id: str):
 class SummarizationSave(BaseModel):
     project_id: str
     meeting_title: str
-    language: str
-    detected_language: str
+    language: str = "en"
+    detected_language: str = "en"
     transcript_chars: int
     summary: str
     key_takeaways: list

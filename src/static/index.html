@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SummarAI — Meeting Summarizer</title>
+<style>
+  :root {
+    --bg-0: #0a0a1f;
+    --bg-1: #11122e;
+    --bg-2: #1a1b45;
+    --indigo: #4f46e5;
+    --indigo-bright: #6366f1;
+    --violet: #8b5cf6;
+    --glow: #818cf8;
+    --text: #e2e4f5;
+    --text-dim: #9395b8;
+    --card: rgba(99, 102, 241, 0.06);
+    --card-border: rgba(129, 140, 248, 0.18);
+    --ok: #34d399;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(ellipse 80% 60% at 70% -10%, #2e2a72 0%, transparent 55%),
+                radial-gradient(ellipse 60% 50% at 10% 110%, #312e81 0%, transparent 50%),
+                linear-gradient(160deg, var(--bg-0) 0%, var(--bg-1) 50%, var(--bg-0) 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* floating orbs */
+  .orb {
+    position: fixed; border-radius: 50%; filter: blur(90px); opacity: .35;
+    pointer-events: none; z-index: 0; animation: drift 24s ease-in-out infinite alternate;
+  }
+  .orb.a { width: 420px; height: 420px; background: #4338ca; top: -120px; right: -80px; }
+  .orb.b { width: 340px; height: 340px; background: #6d28d9; bottom: -100px; left: -90px; animation-delay: -12s; }
+  @keyframes drift {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(60px, 40px) scale(1.15); }
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  header { text-align: center; margin-bottom: 44px; }
+  .logo {
+    font-size: 3rem; font-weight: 800; letter-spacing: -.02em;
+    background: linear-gradient(92deg, #c7d2fe 0%, var(--glow) 35%, var(--violet) 70%, #c4b5fd 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shine 6s linear infinite;
+  }
+  @keyframes shine { to { background-position: 200% center; } }
+  .tagline { color: var(--text-dim); margin-top: 10px; font-size: 1.05rem; }
+
+  /* language toggle */
+  .lang-row { display: flex; justify-content: center; gap: 0; margin-bottom: 28px; }
+  .lang-toggle {
+    display: inline-flex; background: rgba(10,10,31,.6); border: 1px solid var(--card-border);
+    border-radius: 999px; padding: 4px; backdrop-filter: blur(10px);
+  }
+  .lang-toggle button {
+    border: 0; background: transparent; color: var(--text-dim); font: inherit;
+    padding: 8px 22px; border-radius: 999px; cursor: pointer; transition: all .25s ease;
+  }
+  .lang-toggle button.active {
+    background: linear-gradient(135deg, var(--indigo), var(--violet));
+    color: #fff; box-shadow: 0 0 18px rgba(99,102,241,.5);
+  }
+
+  /* dropzone */
+  .dropzone {
+    position: relative;
+    border: 1.5px dashed rgba(129,140,248,.35);
+    border-radius: 20px;
+    background: var(--card);
+    backdrop-filter: blur(12px);
+    padding: 56px 28px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .25s, background .25s, transform .25s, box-shadow .25s;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--glow);
+    background: rgba(99,102,241,.12);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 44px rgba(79,70,229,.25);
+  }
+  .dropzone .icon { font-size: 2.6rem; display: block; margin-bottom: 14px; filter: drop-shadow(0 0 12px rgba(129,140,248,.6)); }
+  .dropzone strong { color: var(--glow); }
+  .dropzone .hint { color: var(--text-dim); font-size: .88rem; margin-top: 10px; }
+  .dropzone input { display: none; }
+  .file-chip {
+    display: none; margin: 18px auto 0; padding: 8px 18px; border-radius: 999px;
+    background: rgba(99,102,241,.18); border: 1px solid var(--card-border);
+    color: var(--text); font-size: .9rem; width: fit-content; max-width: 90%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .go {
+    display: block; margin: 26px auto 0; border: 0; cursor: pointer; font: inherit;
+    font-weight: 700; font-size: 1.05rem; color: #fff; padding: 15px 52px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--indigo) 0%, var(--violet) 100%);
+    box-shadow: 0 8px 28px rgba(79,70,229,.45);
+    transition: transform .2s, box-shadow .2s, opacity .2s;
+  }
+  .go:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(99,102,241,.6); }
+  .go:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* processing shimmer */
+  .processing { display: none; text-align: center; margin-top: 36px; }
+  .processing .bar {
+    height: 6px; border-radius: 999px; overflow: hidden; max-width: 420px; margin: 0 auto 16px;
+    background: rgba(99,102,241,.12);
+  }
+  .processing .bar i {
+    display: block; height: 100%; width: 40%;
+    background: linear-gradient(90deg, transparent, var(--indigo-bright), var(--violet), transparent);
+    animation: slide 1.4s ease-in-out infinite;
+  }
+  @keyframes slide { from { transform: translateX(-110%); } to { transform: translateX(290%); } }
+  .processing p { color: var(--text-dim); font-size: .95rem; }
+
+  /* results */
+  .results { display: none; margin-top: 44px; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 18px;
+    backdrop-filter: blur(12px); padding: 26px 28px; margin-bottom: 22px;
+    opacity: 0; transform: translateY(18px);
+    animation: rise .55s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  .card:nth-child(2) { animation-delay: .12s; }
+  .card:nth-child(3) { animation-delay: .24s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .card h2 {
+    font-size: .82rem; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--glow); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--card-border), transparent); }
+  .card p { line-height: 1.65; color: var(--text); white-space: pre-wrap; }
+
+  .card ul { list-style: none; }
+  .card ul li {
+    padding: 9px 0 9px 26px; position: relative; line-height: 1.5;
+    border-bottom: 1px solid rgba(129,140,248,.08);
+  }
+  .card ul li:last-child { border-bottom: 0; }
+  .card ul li::before {
+    content: "◆"; position: absolute; left: 2px; color: var(--violet); font-size: .7rem; top: 13px;
+  }
+
+  .action { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(129,140,248,.08); }
+  .action:last-child { border-bottom: 0; }
+  .action .check {
+    width: 18px; height: 18px; margin-top: 2px; flex: none; border-radius: 6px;
+    border: 1.5px solid var(--glow); cursor: pointer; transition: all .2s;
+  }
+  .action.done .check { background: var(--ok); border-color: var(--ok); box-shadow: 0 0 10px rgba(52,211,153,.5); }
+  .action.done .task { text-decoration: line-through; color: var(--text-dim); }
+  .action .task { flex: 1; line-height: 1.45; }
+  .badge {
+    display: inline-block; font-size: .72rem; font-weight: 700; padding: 3px 10px;
+    border-radius: 999px; margin-left: 8px; vertical-align: 2px;
+  }
+  .badge.owner { background: rgba(139,92,246,.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,.35); }
+  .badge.deadline { background: rgba(99,102,241,.18); color: #a5b4fc; border: 1px solid rgba(99,102,241,.35); }
+
+  .meta { text-align: center; color: var(--text-dim); font-size: .82rem; margin-top: 6px; }
+  .error {
+    display: none; margin: 26px auto 0; max-width: 560px; padding: 14px 20px; border-radius: 12px;
+    background: rgba(244,63,94,.12); border: 1px solid rgba(244,63,94,.4); color: #fda4af;
+    font-size: .92rem; text-align: center;
+  }
+  .again { display: none; margin: 8px auto 0; background: none; border: 0; color: var(--glow); cursor: pointer; font: inherit; font-size: .9rem; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="orb a"></div>
+<div class="orb b"></div>
+
+<div class="wrap">
+  <header>
+    <div class="logo">SummarAI</div>
+    <p class="tagline" data-en="Turn meetings into summaries, takeaways and action items — in your language."
+                       data-es="Convierte reuniones en resúmenes, puntos clave y tareas — en tu idioma.">
+      Turn meetings into summaries, takeaways and action items — in your language.</p>
+  </header>
+
+  <div class="lang-row">
+    <div class="lang-toggle">
+      <button id="lang-en" class="active">🇬🇧 English</button>
+      <button id="lang-es">🇪🇸 Español</button>
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <span class="icon">🎙️</span>
+    <div data-en="Drop your meeting here or <strong>browse</strong>"
+         data-es="Arrastra tu reunión aquí o <strong>busca un archivo</strong>">
+         Drop your meeting here or <strong>browse</strong></div>
+    <div class="hint" data-en="mp4 · mp3 · wav · m4a · txt — audio is transcribed automatically"
+                      data-es="mp4 · mp3 · wav · m4a · txt — el audio se transcribe automáticamente">
+         mp4 · mp3 · wav · m4a · txt — audio is transcribed automatically</div>
+    <div class="file-chip" id="file-chip"></div>
+    <input type="file" id="file-input" accept=".mp4,.mp3,.wav,.m4a,.webm,.ogg,.flac,.txt,.md,.vtt,.srt">
+  </div>
+
+  <button class="go" id="go" disabled data-en="✦ Summarize" data-es="✦ Resumir">✦ Summarize</button>
+
+  <div class="processing" id="processing">
+    <div class="bar"><i></i></div>
+    <p id="processing-text"></p>
+  </div>
+
+  <div class="error" id="error"></div>
+  <button class="again" id="again" data-en="↺ Analyze another meeting" data-es="↺ Analizar otra reunión">↺ Analyze another meeting</button>
+
+  <div class="results" id="results">
+    <div class="card">
+      <h2 data-en="Summary" data-es="Resumen">Summary</h2>
+      <p id="summary"></p>
+    </div>
+    <div class="card">
+      <h2 data-en="Key takeaways" data-es="Puntos clave">Key takeaways</h2>
+      <ul id="takeaways"></ul>
+    </div>
+    <div class="card">
+      <h2 data-en="Action items" data-es="Tareas pendientes">Action items</h2>
+      <div id="actions"></div>
+    </div>
+    <p class="meta" id="meta"></p>
+  </div>
+</div>
+
+<script>
+  const I18N = {
+    en: { stages: ["Reading your file…", "Transcribing audio…", "Understanding the meeting…", "Extracting action items…"],
+          none: "No clear action items were found in this meeting.", chars: "transcript characters analyzed" },
+    es: { stages: ["Leyendo tu archivo…", "Transcribiendo el audio…", "Entendiendo la reunión…", "Extrayendo las tareas…"],
+          none: "No se encontraron tareas claras en esta reunión.", chars: "caracteres de transcripción analizados" },
+  };
+
+  let lang = "en";
+  let file = null;
+
+  const $ = (id) => document.getElementById(id);
+  const dropzone = $("dropzone"), input = $("file-input"), chip = $("file-chip"),
+        go = $("go"), processing = $("processing"), results = $("results"),
+        errBox = $("error"), again = $("again");
+
+  function setLang(next) {
+    lang = next;
+    $("lang-en").classList.toggle("active", next === "en");
+    $("lang-es").classList.toggle("active", next === "es");
+    document.querySelectorAll("[data-en]").forEach((el) => { el.innerHTML = el.dataset[next]; });
+  }
+  $("lang-en").onclick = () => setLang("en");
+  $("lang-es").onclick = () => setLang("es");
+
+  function setFile(f) {
+    file = f;
+    chip.textContent = `📄 ${f.name}`;
+    chip.style.display = "block";
+    go.disabled = false;
+  }
+  dropzone.onclick = () => input.click();
+  input.onchange = () => input.files[0] && setFile(input.files[0]);
+  ["dragenter", "dragover"].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+    e.preventDefault(); dropzone.classList.add("dragover");
+  }));
+  ["dragleave", "drop"].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+    e.preventDefault(); dropzone.classList.remove("dragover");
+  }));
+  dropzone.addEventListener("drop", (e) => e.dataTransfer.files[0] && setFile(e.dataTransfer.files[0]));
+
+  let stageTimer = null;
+  function startStages() {
+    const stages = I18N[lang].stages;
+    let i = 0;
+    $("processing-text").textContent = stages[0];
+    stageTimer = setInterval(() => {
+      i = Math.min(i + 1, stages.length - 1);
+      $("processing-text").textContent = stages[i];
+    }, 2600);
+  }
+
+  go.onclick = async () => {
+    if (!file) return;
+    go.disabled = true;
+    errBox.style.display = "none";
+    results.style.display = "none";
+    again.style.display = "none";
+    processing.style.display = "block";
+    startStages();
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("language", lang);
+
+    try {
+      const res = await fetch("/api/process", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Something went wrong.");
+      render(data);
+    } catch (e) {
+      errBox.textContent = "⚠ " + e.message;
+      errBox.style.display = "block";
+    } finally {
+      clearInterval(stageTimer);
+      processing.style.display = "none";
+      go.disabled = false;
+      again.style.display = "block";
+    }
+  };
+
+  again.onclick = () => {
+    results.style.display = "none";
+    errBox.style.display = "none";
+    again.style.display = "none";
+    chip.style.display = "none";
+    file = null; input.value = "";
+    go.disabled = true;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  function render(data) {
+    $("summary").textContent = data.summary;
+
+    const takeaways = $("takeaways");
+    takeaways.innerHTML = "";
+    data.key_takeaways.forEach((t) => {
+      const li = document.createElement("li");
+      li.textContent = t;
+      takeaways.appendChild(li);
+    });
+
+    const actions = $("actions");
+    actions.innerHTML = "";
+    if (!data.action_items.length) {
+      actions.innerHTML = `<p style="color:var(--text-dim)">${I18N[lang].none}</p>`;
+    }
+    data.action_items.forEach((a) => {
+      const row = document.createElement("div");
+      row.className = "action";
+      const check = document.createElement("div");
+      check.className = "check";
+      check.onclick = () => row.classList.toggle("done");
+      const task = document.createElement("div");
+      task.className = "task";
+      task.textContent = a.task;
+      if (a.owner) task.insertAdjacentHTML("beforeend", ` <span class="badge owner">@${escapeHtml(a.owner)}</span>`);
+      if (a.deadline) task.insertAdjacentHTML("beforeend", ` <span class="badge deadline">⏰ ${escapeHtml(a.deadline)}</span>`);
+      row.append(check, task);
+      actions.appendChild(row);
+    });
+
+    $("meta").textContent = `${data.transcript_chars.toLocaleString()} ${I18N[lang].chars}`;
+
+    // re-trigger card entrance animations
+    results.querySelectorAll(".card").forEach((c) => {
+      c.style.animation = "none"; void c.offsetWidth; c.style.animation = "";
+    });
+    results.style.display = "block";
+    results.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+</script>
+</body>
+</html>

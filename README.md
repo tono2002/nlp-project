@@ -1,6 +1,6 @@
 # SummarAI — Meeting Summarizer
 
-An NLP-powered **bilingual (English / Spanish)** web app that turns a meeting recording (or transcript) into a **summary**, a list of **key takeaways**, and a set of **actionable insights / action items** — in the language the user chooses, regardless of the meeting's original language.
+An NLP-powered web app that turns a meeting recording (or transcript) into a **2-sentence summary**, a set of **typed key-takeaway bullets** (decision / note), and **action items** (task · owner · deadline). Summaries can be organised into **projects** and saved.
 
 **Course:** NLP — Group Assignment · **Option 1: Application Development**
 **Team:** Antonio · Martí · Bojana · Smaragda · Jo
@@ -12,88 +12,97 @@ An NLP-powered **bilingual (English / Spanish)** web app that turns a meeting re
 ## 1. The idea
 
 ```
-INPUT (mp4 or txt)  →  transcribe to text  →  ┌─ Summary
-                                              ├─ Key takeaways
-                                              └─ Actionable insights / plans
+INPUT (mp4/mp3/wav/m4a or txt) → transcribe → analyse → ┌─ Summary (≤ 2 sentences)
+                                                        ├─ Key takeaways (decision / note bubbles)
+                                                        └─ Action items (task · owner · deadline)
 ```
 
-You upload a meeting (audio/video file, or paste an existing transcript) and pick your output language (**English or Spanish**). SummarAI:
-1. **Transcribes** the audio into text (speech-to-text).
-2. **Reads** the transcript and produces, **in the chosen language**:
-   - a concise **summary** of the meeting,
-   - the **key takeaways** (main points/decisions),
-   - the **action items** — who has to do what, by when.
-
-**Bilingual / cross-lingual:** the meeting can be in English and a Spanish user can still get the summary, takeaways, and actions in Spanish (and vice versa). The output language is independent of the meeting's language.
+You upload a meeting (audio/video file, or an existing transcript). SummarAI:
+1. **Transcribes** audio into text with Whisper (skipped if the input is already text).
+2. **Analyses** the transcript with an LLM and returns, in English:
+   - a tight **summary** (max 2 sentences),
+   - **key takeaways** as short, scannable bullets, each tagged **decision** or **note**,
+   - **action items** — who has to do what, by when (owner/deadline only when actually stated).
+3. Optionally **saves** the result to a **project** (persisted in Supabase) and shows it in a timeline.
 
 ## 2. Where the NLP is
 
 The web app is just the interface. The intelligence is in two NLP stages:
 
-| Stage | NLP task | Notes |
+| Stage | NLP task | How |
 |---|---|---|
-| Audio → text | **Speech-to-text (ASR)** | Uses an existing engine (e.g. Whisper). Skipped if the input is already `txt`. |
-| Text → insights | **Summarization + information extraction** | The core of the project: condense the transcript and pull out takeaways and action items. |
-| Output language | **Cross-lingual generation / translation** | Produce the insights in the user's chosen language (EN/ES) even when the meeting is in the other one, preserving meaning. |
+| Audio → text | **Speech-to-text (ASR)** | `faster-whisper` (`base` model), local CPU. Skipped for `txt` input. |
+| Text → insights | **Summarization + information extraction** | Claude **Haiku 4.5** with a strict JSON schema → summary, typed takeaways, action items. |
 
 ## 3. Justification of need
 
-Meetings are everywhere and most of their value is lost: people forget decisions, action items slip, and nobody re-watches a one-hour recording. Existing tools (Otter, Fireflies, Zoom AI Companion, etc.) exist but are paid, closed, and not always good at pulling **clear, owned action items**. They are also mostly **monolingual** — a Spanish speaker in an English meeting gets an English summary. SummarAI focuses on turning talk into a concrete to-do list **and delivering it in the user's own language (EN/ES)**.
+Meetings are everywhere and most of their value is lost: people forget decisions, action items slip, and nobody re-watches a one-hour recording. Existing tools (Otter, Fireflies, Zoom AI Companion) are paid, closed, and not always good at pulling **clear, owned action items**. SummarAI focuses on turning talk into a concrete, owned to-do list, separates **decisions from notes**, and keeps a per-project memory of past meetings.
 
 _(Full justification + field review go in the technical report.)_
 
-## 4. Evaluation focus — the part that gets graded
+## 4. Evaluation focus — the part that gets graded ⚠️
 
-We must test the system on our **own 30–50 example test set** and report a real score.
+We must test the system on our **own 30–50 example test set** and report a real score. **This is the biggest open task** (see status below).
 
-- **Primary, measurable target: action-item extraction.** Each test transcript has a known list of "true" action items (task + owner). We measure **precision/recall**: did the app catch the real actions, miss any, or invent fake ones?
-- **Cross-lingual check:** test set includes English meetings with **Spanish** expected outputs (and vice versa) to verify the action items survive the language switch with the same meaning.
-- Summary and key takeaways are evaluated more qualitatively (and/or with ROUGE), since "a good summary" is subjective.
+- **Primary, measurable target: action-item extraction.** Each test transcript has a known list of "true" action items (task + owner). We measure **precision / recall**: did the app catch the real actions, miss any, or invent fake ones?
+- Secondary: takeaway **type** accuracy (decision vs note) and summary quality (qualitative / ROUGE).
 
-This is where the marks live — see [data/eval/](data/eval/).
+Test set, expected outputs, and the eval script live in [data/eval/](data/eval/).
 
-## 5. Tech (planned)
+## 5. Tech stack (built)
 
-- **Frontend/web app:** _TODO_
-- **Transcription:** _TODO (e.g. OpenAI Whisper)_
-- **Summarization / extraction:** _TODO (LLM API or open model)_
-- See [docs/installation_guide.md](docs/installation_guide.md) to run it.
+- **Backend:** Python + **FastAPI** ([src/app.py](src/app.py)) — endpoints for processing, projects, and saved summarizations.
+- **Transcription:** [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) `base` model, local, int8.
+- **Analysis:** **Claude Haiku 4.5** via the Anthropic SDK, structured JSON output.
+- **Frontend:** single-page vanilla JS + CSS ([src/static/index.html](src/static/index.html)) — midnight-indigo theme, drag-and-drop, typed takeaway bubbles, action checklist, **collapsible sidebar**, **iPhone-responsive**.
+- **Persistence:** **Supabase** (Postgres) — `projects` + `summarizations` tables ([supabase_schema.sql](supabase_schema.sql)).
+- Run it: see [docs/installation_guide.md](docs/installation_guide.md).
 
 ---
 
-## 6. Deliverables (Option 1)
+## 6. Project status
 
-All submitted via the course platform. Placeholders already exist in this repo.
+### ✅ Done
+- [x] Functional POC: upload → transcribe → summary + typed takeaways + action items
+- [x] Whisper transcription verified on a real ~20-min `m4a`
+- [x] Project management + Supabase persistence + timeline view
+- [x] English-only output, 2-sentence summary, decision/note bubbles
+- [x] Responsive (iPhone) layout + collapsible projects sidebar
+- [x] Technical Report drafted as PDF ([docs/SummarAI_Technical_Report.pdf](docs/SummarAI_Technical_Report.pdf))
 
-| # | Deliverable | File |
-|---|---|---|
-| 1 | Technical report (PDF) | [deliverables/technical_report.md](deliverables/technical_report.md) |
-| 2 | One-page executive summary (non-technical) | [deliverables/executive_summary.md](deliverables/executive_summary.md) |
-| 3 | Presentation slides | [deliverables/slides.md](deliverables/slides.md) |
-| 4 | Code repository | this repo · [src/](src/) |
-| 5 | Supporting artifacts (test set, prompts) | [data/eval/](data/eval/) · [prompts/](prompts/) |
-| 6 | Individual reflections (1 per member) | [deliverables/reflections/](deliverables/reflections/) |
-| 7 | User manual *(Option 1)* | [docs/user_manual.md](docs/user_manual.md) |
-| 8 | Installation / execution guide *(Option 1)* | [docs/installation_guide.md](docs/installation_guide.md) |
+### 🔲 To do (priority order)
+1. **Custom evaluation set** (30–50 transcripts + expected action items) and an **eval script** that reports precision/recall → [data/eval/](data/eval/). *Highest impact on the grade.*
+2. **Failure-mode analysis** — document 5–10 cases with hypotheses (e.g. Whisper mishears names like *Bojana → "Janna"*; podcast input correctly yields zero action items).
+3. **Field review** of the meeting-AI / transcription industry (for the report).
+4. Fill the remaining deliverables: **executive summary**, **slides**, reconcile **technical_report.md** with the PDF, **5 individual reflections**, finish **user manual** & **install guide**.
+5. Document the actual system prompt in [prompts/](prompts/).
+6. (Optional) **Deploy** — local Whisper rules out Vercel serverless; Render / Railway / Fly.io fit a long-running FastAPI app.
+
+---
+
+## 7. Deliverables (Option 1)
+
+| # | Deliverable | File | Status |
+|---|---|---|---|
+| 1 | Technical report (PDF) | [docs/SummarAI_Technical_Report.pdf](docs/SummarAI_Technical_Report.pdf) · [.md](deliverables/technical_report.md) | 🟡 PDF drafted |
+| 2 | One-page executive summary | [deliverables/executive_summary.md](deliverables/executive_summary.md) | 🔲 |
+| 3 | Presentation slides | [deliverables/slides.md](deliverables/slides.md) | 🔲 |
+| 4 | Code repository | this repo · [src/](src/) | ✅ |
+| 5 | Supporting artifacts (test set, prompts) | [data/eval/](data/eval/) · [prompts/](prompts/) | 🔲 |
+| 6 | Individual reflections (1 per member) | [deliverables/reflections/](deliverables/reflections/) | 🔲 |
+| 7 | User manual *(Option 1)* | [docs/user_manual.md](docs/user_manual.md) | 🟡 partial |
+| 8 | Installation / execution guide *(Option 1)* | [docs/installation_guide.md](docs/installation_guide.md) | 🟡 partial |
 
 The report must include a **"Use of AI tools"** section describing how we used LLMs.
 
-## 7. Required components (Option 1)
+## 8. Required components (Option 1)
 
-- **Justification of need** — why SummarAI is needed and what existing tools lack.
-- **Field review** — the meeting-AI / transcription industry: trends, players, gaps.
-- **Functional system** — a working web app demo (POC).
-- **Custom evaluation** — our 30–50 example test set + quantitative results.
-- **Failure mode analysis** — 5–10 documented cases where it fails, with hypotheses.
-- **Reproducible repository** — clean code, clear README, requirements file.
-
-## 8. Process / workflow
-
-| Phase | Focus |
-|---|---|
-| **Early** | Finalize scope, **get professor approval**, agree on roles, scan existing tools |
-| **Middle** | Build the app (transcription + summarization + extraction) and the test set |
-| **Late** | Run the evaluation, analyze failures, write report, make slides, rehearse |
+- **Justification of need** — why SummarAI is needed and what existing tools lack. 🟡
+- **Field review** — the meeting-AI / transcription industry: trends, players, gaps. 🔲
+- **Functional system** — a working web app demo (POC). ✅
+- **Custom evaluation** — our 30–50 example test set + quantitative results. 🔲
+- **Failure mode analysis** — 5–10 documented cases where it fails, with hypotheses. 🔲
+- **Reproducible repository** — clean code, clear README, requirements file. ✅
 
 ## 9. Evaluation criteria (rubric)
 

@@ -28,6 +28,11 @@ AUDIO_EXTENSIONS = {".mp4", ".mp3", ".wav", ".m4a", ".webm", ".ogg", ".flac"}
 TEXT_EXTENSIONS = {".txt", ".md", ".vtt", ".srt"}
 MAX_TRANSCRIPT_CHARS = 300_000
 
+# Whisper speed knobs (all zero-cost). "base.en" = English-only, faster + more
+# accurate for English than the multilingual "base". Use "tiny.en" for an even
+# faster live demo at some accuracy cost. Override with the WHISPER_MODEL env var.
+WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base.en")
+
 SUPABASE_URL =os.environ.get("SUPABASE_URL", "https://ssooqczamcqxpvcpeebv.supabase.co")
 SUPABASE_KEY = os.environ.get(
     "SUPABASE_ANON_KEY",
@@ -121,8 +126,18 @@ def transcribe(path: str) -> str:
             "Install it with: pip install faster-whisper",
         )
     if _whisper_model is None:
-        _whisper_model = WhisperModel("base", compute_type="int8")
-    segments, _info = _whisper_model.transcribe(path, vad_filter=True)
+        _whisper_model = WhisperModel(
+            WHISPER_MODEL,
+            compute_type="int8",
+            cpu_threads=os.cpu_count() or 4,
+        )
+    segments, _info = _whisper_model.transcribe(
+        path,
+        beam_size=1,                     # greedy: ~2x faster than the default beam of 5
+        vad_filter=True,                 # skip silence
+        condition_on_previous_text=False,  # faster, avoids repetition loops
+        language="en",                   # skip the language-detection pass (English app)
+    )
     return " ".join(segment.text.strip() for segment in segments)
 
 

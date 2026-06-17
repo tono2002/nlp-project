@@ -123,27 +123,38 @@ The Whisper model is configurable via the `WHISPER_MODEL` environment variable �
 
 ### 5.1 Methodology
 
-We built a custom test set of 40 English-language meeting transcripts. Each example was annotated with a reference set of ground-truth action items (task description + owner, where stated). Transcripts were sourced from publicly available meeting recordings and internally produced test conversations designed to cover a range of meeting types: project standups, planning sessions, and decision-heavy strategic calls.
+Our test set is 30 meetings from the **AMI Meeting Corpus** (Carletta et al., 2006), a widely used research dataset of recorded meetings — these are the same recordings used for the demo (`ES2002a`–`ES2009c`). AMI is annotated with human-written abstractive summaries, each split into `ABSTRACT`, `DECISIONS`, and `ACTIONS` sections. We use those human annotations as ground truth. We did not hand-label our own answers; instead we reuse professional human annotations and built the evaluation around them, which avoids the circularity of grading an LLM against answers we wrote ourselves.
 
-Evaluation focused on **action-item extraction**, the output field most amenable to precise measurement. We applied standard information-retrieval metrics:
+We evaluate the two pipeline stages separately. Transcription speed is reported in Section 4.3; here we assess the **summarization** stage. Each meeting's transcript is passed to the summarizer and its output compared against the AMI human reference. We feed our own Whisper transcripts (not AMI's clean reference transcripts) as input, so the scores reflect the full audio-to-summary path, including transcription noise.
 
-- **Precision**: fraction of extracted action items that match a ground-truth item.
-- **Recall**: fraction of ground-truth items successfully extracted.
-- **F1**: harmonic mean of precision and recall.
+We report two automatic metrics, computed by `data/eval/evaluate_rouge.py`:
 
-Matching was done with a combination of exact string overlap (for owner and deadline) and semantic similarity threshold (for task text), since paraphrase is expected between the reference and the model output.
+- **ROUGE-1 / 2 / L (F-measure)** — our full output (summary + takeaways + action items, rendered as text) against the human reference (abstract + decisions + actions). ROUGE is the standard meeting-summarization metric and is explicitly accepted by the assignment.
+- **Action-item coverage (recall)** — the fraction of the human `ACTIONS` sentences that a predicted action item covers, counting a match when ROUGE-L F ≥ 0.30. This measures the headline feature directly against the human action annotations.
 
-Secondary evaluation covered **takeaway type accuracy** (decision vs. note classification) and **summary quality** assessed qualitatively, as automated metrics like ROUGE correlate poorly with human judgement on short, abstractive summaries.
+We report coverage (recall) rather than precision/F1 for action items because AMI's `ACTIONS` list is a curated human selection, not an exhaustive enumeration of every commitment in the meeting; penalising a model action that AMI's annotator simply chose not to list would understate true precision.
 
 ### 5.2 Results
 
-The system performed well on its core task. Summaries were consistently coherent and accurately reflected the meeting's main purpose and outcome. Action items were correctly identified in the large majority of test cases, with higher precision than recall — the model rarely invented false action items, but occasionally missed implicit commitments.
+Across the 30 meetings:
 
-Takeaway type accuracy was high when the distinction was unambiguous (explicit votes or approvals → decision; factual updates → note) and lower on borderline cases where participants framed decisions as suggestions.
+| Metric | Score |
+|---|---|
+| ROUGE-1 (F, avg) | 0.335 |
+| ROUGE-2 (F, avg) | 0.057 |
+| ROUGE-L (F, avg) | 0.148 |
+| Action-item coverage (recall) | 0.424 (28 / 66) |
 
-### 5.3 Main limitation identified
+The summaries are coherent and stay on topic. The ROUGE figures are modest, and the main reason is a deliberate **format mismatch**: our summary is two sentences by design, whereas an AMI reference is a ~200-word, multi-section document. ROUGE rewards n-gram overlap, so a deliberately compressed, differently-structured output is penalised on *form* even when its content is accurate. A ROUGE-1 of 0.34 means our output shares roughly a third of its unigrams with a much longer human summary — a reasonable result for an output that is an order of magnitude shorter. Two further factors push the numbers down honestly: the input is noisy Whisper output rather than clean text, and the model is run zero-shot with no fine-tuning on AMI.
 
-Owner attribution was the clearest failure mode. When a speaker's name was explicitly mentioned in the meeting ("Ana, can you handle this?"), the model correctly assigned ownership. When responsibility was implied or distributed, the model frequently left the `owner` field null rather than guessing — which is the conservative and correct behaviour, but results in incomplete action items. This is a fundamental limitation of working with transcripts that do not label speakers by name.
+The most informative number is the **42% action-item coverage**: working end to end from raw audio, against strict human annotations, the system recovers roughly four of every ten action items a human annotator recorded.
+
+### 5.3 Error analysis
+
+Two systematic factors explain most of the missed action items:
+
+1. **Representation gap.** AMI annotates actions by *role* ("the industrial designer will work on the design"), while SummarAI extracts them by *name* (the person actually addressed in the conversation). The underlying task is the same, but the surface forms differ enough to fall below the overlap threshold, which accounts for several apparent misses that are not really errors.
+2. **Owner attribution / speaker identity.** Whisper produces no speaker labels. When responsibility is implied rather than named, the model leaves `owner` null rather than guessing — conservative and arguably correct, but it still counts as an incomplete action item. This is the clearest limitation of the system and the most direct target for future work (Section 7).
 
 ---
 

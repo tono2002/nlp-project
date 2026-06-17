@@ -1,125 +1,117 @@
-# SummarAI: Meeting Summarizer
+<div align="center">
 
-An NLP-powered web app that turns a meeting recording (or transcript) into a **2-sentence summary**, a set of **typed key-takeaway bullets** (decision / note), and **action items** (task · owner · deadline). Summaries can be organised into **projects** and saved.
+# SummarAI
 
-**Course:** NLP, Group Assignment · **Option 1: Application Development**
-**Team:** Antonio · Martí · Bojana · Smaragda · Jo
+### Turn any meeting recording into a summary, decisions, and owned action items.
 
-> See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the simple step-by-step plan.
+![Option 1](https://img.shields.io/badge/Assignment-Option%201%3A%20Application-4f46e5)
+![Python](https://img.shields.io/badge/Python-3.9-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Whisper](https://img.shields.io/badge/Whisper-base.en-6366f1)
+![Claude](https://img.shields.io/badge/Claude-Haiku%204.5-8b5cf6)
+
+![SummarAI interface](assets/landing.png)
+
+</div>
 
 ---
 
-## 1. The idea
+## What it is
 
+SummarAI is a web app that turns a meeting recording into a written record people actually use. You upload an audio file (or paste a transcript), and within a couple of minutes it gives back three things: a two-sentence summary, the key takeaways (each marked as a **decision** or a **note**), and a list of **action items** showing the task, who owns it, and any deadline. Results can be saved into **projects**, so a team keeps a searchable history of what was agreed.
+
+The goal was not to build another transcription tool. Plenty of those exist. SummarAI reads the conversation and pulls out the parts that matter after the call: the decisions and the to-dos.
+
+## Example output
+
+A real run on a short product-sync meeting:
+
+<div align="center">
+<img src="assets/results.png" width="620" alt="SummarAI example output: summary, decision/note takeaways, and action items with owners and deadlines">
+</div>
+
+## How it works
+
+The web page is just the interface. The intelligence is two NLP stages, run one after the other:
+
+```mermaid
+flowchart LR
+    A[Audio or video] -->|Whisper, local| B[Transcript]
+    T[Text transcript] --> B
+    B -->|Claude Haiku 4.5| C{Structured output}
+    C --> D[Summary, 2 sentences]
+    C --> E[Key takeaways, decision or note]
+    C --> F[Action items, task / owner / deadline]
 ```
-INPUT (mp4/mp3/wav/m4a or txt) → transcribe → analyse → ┌─ Summary (≤ 2 sentences)
-                                                        ├─ Key takeaways (decision / note bubbles)
-                                                        └─ Action items (task · owner · deadline)
+
+1. **Speech to text.** `faster-whisper` (the `base.en` model) transcribes the audio locally on the CPU. If you upload a text transcript, this step is skipped.
+2. **Summarize and extract.** The transcript goes to Claude Haiku 4.5 with a strict output structure, which guarantees the result is always a clean summary, typed takeaways, and action items.
+
+## Results
+
+We evaluated the summarization stage on **30 real meetings from the AMI Meeting Corpus**, comparing SummarAI's output against the **human-written summaries** that ship with the corpus. No hand-labeling: we reuse professional human annotations, which keeps the evaluation honest.
+
+| Metric | Score |
+|---|---|
+| ROUGE-1 | 0.34 |
+| ROUGE-2 | 0.06 |
+| ROUGE-L | 0.15 |
+| Action items recovered (recall) | 42% (28 of 66) |
+
+Working end to end from raw audio, the system recovers about four in ten of the action items a human annotator recorded. Full methodology and per-meeting results are in [`data/eval/`](data/eval/).
+
+## Features
+
+- Upload audio or video (`.mp4`, `.mp3`, `.wav`, `.m4a`, `.webm`, `.ogg`, `.flac`) or a text transcript (`.txt`, `.md`, `.vtt`, `.srt`).
+- Local transcription, so the audio never leaves your machine.
+- Two-sentence summary, plus takeaways tagged decision or note, plus action items with owner and deadline.
+- Save results into projects, with a timeline view and a searchable history (Supabase).
+- Clean, responsive interface that works on a phone, with a collapsible projects panel.
+
+## Tech stack
+
+| Part | Choice |
+|---|---|
+| Backend | Python, FastAPI ([`src/app.py`](src/app.py)) |
+| Transcription | [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper), `base.en`, local CPU |
+| Summarization | Claude Haiku 4.5, structured JSON output |
+| Frontend | Single-page vanilla JavaScript and CSS ([`src/static/index.html`](src/static/index.html)) |
+| Persistence | Supabase (Postgres) |
+
+## Run it locally
+
+```bash
+git clone https://github.com/tono2002/nlp-project.git
+cd nlp-project
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env          # then add your ANTHROPIC_API_KEY
+uvicorn src.app:app --reload
 ```
 
-You upload a meeting (audio/video file, or an existing transcript). SummarAI:
-1. **Transcribes** audio into text with Whisper (skipped if the input is already text).
-2. **Analyses** the transcript with an LLM and returns, in English:
-   - a tight **summary** (max 2 sentences),
-   - **key takeaways** as short, scannable bullets, each tagged **decision** or **note**,
-   - **action items**: who has to do what, by when (owner/deadline only when actually stated).
-3. Optionally **saves** the result to a **project** (persisted in Supabase) and shows it in a timeline.
+Open `http://localhost:8000`, drop in a recording, and click Summarise. The first audio upload downloads the Whisper model once. Full details and troubleshooting are in the [installation guide](docs/installation_guide.md).
 
-## 2. Where the NLP is
+## Deliverables
 
-The web app is just the interface. The intelligence is in two NLP stages:
+| Deliverable | Where |
+|---|---|
+| Technical report | [deliverables/technical_report.md](deliverables/technical_report.md) |
+| Executive summary (one page) | [deliverables/executive_summary.md](deliverables/executive_summary.md) |
+| Presentation slides | [deliverables/slides.md](deliverables/slides.md) |
+| User manual | [docs/user_manual.md](docs/user_manual.md) |
+| Installation guide | [docs/installation_guide.md](docs/installation_guide.md) |
+| Evaluation (data, script, results) | [data/eval/](data/eval/) |
+| Prompt documentation | [prompts/system_prompt.md](prompts/system_prompt.md) |
+| Individual reflections | [deliverables/reflections/](deliverables/reflections/) |
 
-| Stage | NLP task | How |
-|---|---|---|
-| Audio → text | **Speech-to-text (ASR)** | `faster-whisper` (`base.en` model), local CPU. Skipped for `txt` input. |
-| Text → insights | **Summarization + information extraction** | Claude **Haiku 4.5** with a strict JSON schema → summary, typed takeaways, action items. |
+## Honest limitations
 
-## 3. Justification of need
+- **It does not know who is speaking.** The transcription has no speaker labels, so when nobody is named the action-item owner is left blank rather than guessed. This is the clearest thing to improve next.
+- **It assumes English audio.** The transcription model is tuned for English.
+- **Audio quality matters.** Heavy noise, strong accents, or people talking over each other lower transcription accuracy, and that carries through to the summary.
 
-Meetings are everywhere and most of their value is lost: people forget decisions, action items slip, and nobody re-watches a one-hour recording. Existing tools (Otter, Fireflies, Zoom AI Companion) are paid, closed, and not always good at pulling **clear, owned action items**. SummarAI focuses on turning talk into a concrete, owned to-do list, separates **decisions from notes**, and keeps a per-project memory of past meetings.
+## Team
 
-_(Full justification + field review go in the technical report.)_
+Antonio · Martí · Bojana · Smaragda · Jo
 
-## 4. Evaluation
-
-We evaluate the **summarization** stage on **30 real meetings from the AMI Meeting Corpus**, using AMI's **human-written summaries** as the ground truth. There is no manual labeling: we reuse the professional human annotations that ship with the corpus and compare the app's output against them automatically.
-
-- **ROUGE-1 / 2 / L** measure how close our output is to the human reference summary.
-- **Action-item coverage** measures how many of the human-annotated action items the app recovers.
-
-Result (30 meetings): **ROUGE-1 0.34**, and the system recovers about **42% of the human action items** working end to end from audio. The methodology, script, and full per-meeting results are in [data/eval/](data/eval/).
-
-## 5. Tech stack (built)
-
-- **Backend:** Python + **FastAPI** ([src/app.py](src/app.py)), endpoints for processing, projects, and saved summarizations.
-- **Transcription:** [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) `base.en` model, local, int8.
-- **Analysis:** **Claude Haiku 4.5** via the Anthropic SDK, structured JSON output.
-- **Frontend:** single-page vanilla JS + CSS ([src/static/index.html](src/static/index.html)), midnight-indigo theme, drag-and-drop, typed takeaway bubbles, action checklist, **collapsible sidebar**, **iPhone-responsive**.
-- **Persistence:** **Supabase** (Postgres), `projects` + `summarizations` tables ([supabase_schema.sql](supabase_schema.sql)).
-- Run it: see [docs/installation_guide.md](docs/installation_guide.md).
-
----
-
-## 6. Project status
-
-### ✅ Done
-- [x] Functional POC: upload → transcribe → summary + typed takeaways + action items
-- [x] Whisper transcription verified on real meeting audio; transcription sped up ~3.5x
-- [x] Project management + Supabase persistence + timeline view
-- [x] English-only output, 2-sentence summary, decision/note bubbles
-- [x] Responsive (iPhone) layout + collapsible projects sidebar
-- [x] Custom evaluation on 30 AMI meetings (ROUGE + action-item coverage)
-- [x] Failure-mode analysis (in the technical report)
-- [x] Technical report, executive summary, user manual, installation guide, prompt documentation
-
-### 🔲 To do
-1. Export the technical report to a fresh **PDF** from the corrected markdown.
-2. Build the **presentation slides**.
-3. Each member writes their **individual reflection**.
-4. (Optional) **Deploy**: local Whisper rules out Vercel serverless; Render / Railway / Fly.io fit a long-running FastAPI app.
-
----
-
-## 7. Deliverables (Option 1)
-
-| # | Deliverable | File | Status |
-|---|---|---|---|
-| 1 | Technical report (PDF) | [.md](deliverables/technical_report.md) | 🟡 content done, export PDF |
-| 2 | One-page executive summary | [deliverables/executive_summary.md](deliverables/executive_summary.md) | ✅ |
-| 3 | Presentation slides | [deliverables/slides.md](deliverables/slides.md) | 🔲 to build |
-| 4 | Code repository | this repo · [src/](src/) | ✅ |
-| 5 | Supporting artifacts (eval set, prompts) | [data/eval/](data/eval/) · [prompts/](prompts/) | ✅ |
-| 6 | Individual reflections (1 per member) | [deliverables/reflections/](deliverables/reflections/) | 🔲 each member |
-| 7 | User manual *(Option 1)* | [docs/user_manual.md](docs/user_manual.md) | ✅ |
-| 8 | Installation / execution guide *(Option 1)* | [docs/installation_guide.md](docs/installation_guide.md) | ✅ |
-
-The report includes the required **"Use of AI tools"** section (Section 8).
-
-## 8. Required components (Option 1)
-
-- **Justification of need**: why SummarAI is needed and what existing tools lack. ✅
-- **Field review**: the meeting-AI / transcription industry, trends, players, gaps. ✅
-- **Functional system**: a working web app demo (POC). ✅
-- **Custom evaluation**: 30 AMI meetings with quantitative results (ROUGE + action-item coverage). ✅
-- **Failure mode analysis**: documented cases with hypotheses. ✅
-- **Reproducible repository**: clean code, clear README, requirements file. ✅
-
-## 9. Evaluation criteria (rubric)
-
-1. **Technical execution and rigor**: sound methodology, quality code and artifacts.
-2. **Empirical evidence and depth of analysis**: conclusions grounded in our own measurements. ← biggest one
-3. **Originality and critical thinking**: non-trivial insights beyond the obvious.
-4. **Communication**: clear report and presentation.
-5. **Reproducibility and quality of deliverables**: others can follow and reproduce our work.
-
-⚠️ Presentation: **20 min + 5 min Q&A.** Every team member must be able to defend any choice made in the project.
-
----
-
-## 10. Useful research repositories
-
-- [Google Scholar](https://scholar.google.es/) · [arXiv](https://arxiv.org/) · [ACL Anthology](https://aclanthology.org/) · [IEEE Xplore](https://ieeexplore.ieee.org/) · [Semantic Scholar](https://www.semanticscholar.org/) · [Papers with Code](https://paperswithcode.com/)
-
----
-
-*"The strongest projects are the ones whose authors can articulate, with concrete observations from their own work, what they learned and why it matters."*
+NLP Group Assignment, Option 1: Application Development.

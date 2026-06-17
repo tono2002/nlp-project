@@ -1,195 +1,113 @@
-## Installation & Execution Guide
+# SummarAI — Installation & Execution Guide
 
-> **Option 1 deliverable.** A reader should be able to run the project from scratch following this guide.
-
----
+This guide takes you from a fresh clone to a running app. It assumes you are comfortable in a terminal.
 
 ## Requirements
 
-| Requirement | Version | Notes |
-|---|---|---|
-| Python | 3.10 or 3.11 | 3.12+ not tested |
-| pip | 23+ | comes with Python |
-| ffmpeg | any recent | required by Whisper for audio decoding |
-| Anthropic API key | — | needed for Claude summarisation |
-| RAM | ≥ 8 GB | Whisper `small` fits comfortably; `medium` needs ~12 GB |
-| Disk space | ≥ 3 GB | for Whisper model weights |
+| Requirement | Notes |
+|---|---|
+| Python 3.9+ | Developed and tested on 3.9 |
+| An Anthropic API key | Used for the summarisation step ([console.anthropic.com](https://console.anthropic.com)) |
+| ~1 GB free disk | For the Whisper transcription model, downloaded on first use |
 
-> **OS:** macOS, Linux, or Windows (PowerShell). All commands below are cross-platform unless noted.
-
----
+You do **not** need to install ffmpeg separately — audio decoding is handled by a library bundled with the transcription engine.
 
 ## Setup
 
 ```bash
-# 1. Clone the repository
+# 1. Clone and enter the project
 git clone https://github.com/tono2002/nlp-project.git
 cd nlp-project
 
 # 2. Create and activate a virtual environment
-python -m venv .venv
+python3 -m venv .venv
+source .venv/bin/activate          # macOS / Linux
+# .venv\Scripts\Activate.ps1        # Windows (PowerShell)
 
-# macOS / Linux
-source .venv/bin/activate
-
-# Windows (PowerShell)
-.venv\Scripts\Activate.ps1
-
-# 3. Install Python dependencies
+# 3. Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Install ffmpeg
-
-ffmpeg is required by Whisper to decode audio and video files.
-
-```bash
-# macOS (Homebrew)
-brew install ffmpeg
-
-# Ubuntu / Debian
-sudo apt update && sudo apt install ffmpeg
-
-# Windows — download from https://ffmpeg.org/download.html
-# and add the bin/ folder to your PATH
-```
-
-Verify the installation:
-
-```bash
-ffmpeg -version
-```
-
----
-
 ## Configuration
 
-Copy the example environment file and fill in your API key:
+Copy the example environment file and add your Anthropic key:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and set your Anthropic API key:
+Then open `.env` and set:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-> The key is only used for the Claude summarisation step. Whisper transcription runs fully locally.
-> Never commit your `.env` file — it is already listed in `.gitignore`.
-
----
+That is the only value you need to run the app. (The Supabase variables are optional — they enable saving meetings into projects, and the project ships with working defaults.) Your `.env` is already git-ignored, so the key won't be committed.
 
 ## Running the app
 
 ```bash
-python src/app.py
+uvicorn src.app:app --reload
 ```
 
-The Gradio interface will start and print a local URL:
+Uvicorn prints a local URL — open it in a browser:
 
 ```
-Running on local URL: http://127.0.0.1:7860
+Uvicorn running on http://127.0.0.1:8000
 ```
 
-Open that URL in your browser. You will see three input options:
+You'll see the upload area. Drop in an audio file (`.mp4`, `.mp3`, `.wav`, `.m4a`, …) or a text transcript (`.txt`, `.vtt`, …) and click **Summarise**.
 
-1. **Upload a file** — drag and drop an audio or video file (`.mp3`, `.mp4`, `.wav`, `.m4a`). Whisper will transcribe it automatically.
-2. **Paste a transcript** — if you already have the text, paste it directly to skip the ASR step.
-3. **Output language** — select `English` or `Spanish`. SummarAI will generate the summary, key takeaways, and action items in the chosen language regardless of the meeting's source language.
+A few notes on first use:
 
-Click **Summarise** and wait. Transcription typically takes 1–3× real-time on CPU (e.g. a 10-minute meeting takes 10–30 seconds). Claude generation adds a further 5–10 seconds.
-
----
-
-## Hosted version
-
-> Live link: _TODO — add Hugging Face Spaces or similar URL once deployed._
-
----
-
-## Running the evaluation
-
-The evaluation pipeline reproduces the results reported in Section 5.3 of the technical report.
-
-```bash
-# Make sure you are in the repo root with the virtual environment active
-
-# 1. Run the pipeline on the test set
-python evaluation/run_eval.py \
-    --test-set data/eval/test_set.csv \
-    --output-dir data/eval/results/
-
-# 2. Compute metrics (ROUGE-L, BERTScore, action-item F1)
-python evaluation/compute_metrics.py \
-    --results-dir data/eval/results/ \
-    --output data/eval/metrics_summary.csv
-
-# 3. Inspect results
-cat data/eval/metrics_summary.csv
-```
-
-The test set CSV lives at `data/eval/test_set.csv`. Each row contains:
-
-| Column | Description |
-|---|---|
-| `audio_id` | Filename (without extension) |
-| `transcript` | Full meeting transcript text |
-| `ref_summary` | Human-written reference summary |
-| `ref_takeaways` | Semicolon-separated reference takeaways |
-| `ref_actions` | Semicolon-separated reference action items (`task\|owner`) |
-| `language_in` | Source language of the meeting (`en` / `es`) |
-| `language_out` | Target output language for evaluation (`en` / `es`) |
-
-See `evaluation/README.md` for details on the annotation methodology and inter-annotator agreement.
-
----
+- The first time you process **audio**, the app downloads the Whisper `base.en` model (~150 MB). This happens once; later runs reuse it.
+- Transcription runs on the CPU and takes roughly a tenth of the recording's length (a 20-minute meeting transcribes in about two minutes). Text transcripts skip this step entirely.
+- To trade accuracy for speed, set `WHISPER_MODEL=tiny.en` in `.env`.
 
 ## Project structure
 
 ```
 nlp-project/
 ├── src/
-│   ├── app.py              # Gradio UI — entry point
-│   ├── transcriber.py      # Whisper ASR wrapper
-│   ├── summariser.py       # Claude API calls (summary, takeaways, actions)
-│   └── prompts/            # Versioned system prompts
-├── evaluation/
-│   ├── run_eval.py         # Runs the pipeline on the test set
-│   ├── compute_metrics.py  # ROUGE-L, BERTScore, action-item F1
-│   └── README.md           # Annotation guide
-├── data/
-│   ├── eval/
-│   │   ├── test_set.csv    # 40 annotated transcripts
-│   │   └── results/        # Pipeline outputs (gitignored)
-│   └── samples/            # Example audio files for quick testing
-├── deliverables/
-│   ├── technical_report.pdf
-│   ├── user_manual.md
-│   └── installation_guide.md   ← you are here
-├── docs/
-├── .env.example
+│   ├── app.py              # FastAPI app: endpoints, Whisper transcription, Claude summarisation
+│   └── static/
+│       └── index.html      # Single-page front end
+├── data/eval/
+│   ├── transcribe_all.py   # Batch-transcribes the evaluation recordings
+│   ├── evaluate_rouge.py   # Scores summaries against AMI human references
+│   ├── _match.py           # Maps recordings to AMI meeting IDs
+│   ├── transcripts/        # Whisper transcripts of the 30 eval meetings
+│   └── results.json        # Evaluation results
+├── docs/                   # User manual, this guide
+├── deliverables/           # Report, executive summary, slides, reflections
 ├── requirements.txt
+├── .env.example
 └── README.md
 ```
 
----
+## Reproducing the evaluation
+
+The numbers in the technical report come from `data/eval/`. To regenerate them:
+
+```bash
+# 1. Download the AMI human annotations (~23 MB, not committed)
+mkdir -p data/eval/ami_raw && cd data/eval/ami_raw
+curl -sO https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip
+unzip -q ami_public_manual_1.6.2.zip && cd -
+
+# 2. Run the evaluation (uses the committed transcripts in data/eval/transcripts/)
+python data/eval/evaluate_rouge.py
+```
+
+This runs SummarAI on the 30 evaluation transcripts and prints ROUGE scores plus action-item coverage, writing the full breakdown to `data/eval/results.json`. See [`data/eval/README.md`](../data/eval/README.md) for the methodology.
 
 ## Troubleshooting
 
-**`ModuleNotFoundError: No module named 'whisper'`**
-Make sure your virtual environment is active (`source .venv/bin/activate` or `.venv\Scripts\Activate.ps1`) before running any commands.
+**`anthropic.AuthenticationError`** — the key in `.env` is missing or wrong. Check it at console.anthropic.com.
 
-**`FileNotFoundError: ffmpeg not found`**
-ffmpeg is not installed or not on your PATH. Follow the ffmpeg installation steps above and restart your terminal.
+**`ANTHROPIC_API_KEY is not set`** — you started the server before creating `.env`, or in a different shell. Confirm `.env` exists in the project root and restart.
 
-**`anthropic.AuthenticationError`**
-Your `ANTHROPIC_API_KEY` in `.env` is missing or invalid. Double-check the key at console.anthropic.com.
+**First audio upload hangs for a minute** — it's downloading the Whisper model. Watch the terminal; it only happens once.
 
-**Whisper is very slow**
-By default the app uses the `small` model. You can switch to `tiny` for faster (lower accuracy) transcription by setting `WHISPER_MODEL=tiny` in your `.env`. For GPU acceleration, make sure `torch` is installed with CUDA support.
-
-**Out of memory error with Whisper**
-Try setting `WHISPER_MODEL=tiny` or `WHISPER_MODEL=base` in `.env`.
+**Transcription feels slow** — set `WHISPER_MODEL=tiny.en` in `.env` for a faster (slightly less accurate) model.

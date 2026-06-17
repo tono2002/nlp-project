@@ -1,33 +1,25 @@
-# Executive Summary
-
-> **One page max. Written for a non-technical reader.** No jargon — explain what the app does, why it matters, and what we found.
-
----
+# SummarAI — Executive Summary
 
 ## What we built
 
-SummarAI is an AI-powered meeting assistant that turns a recorded meeting into a structured written record. Upload the audio or video of any English-language meeting and, within minutes, the app returns a plain-language summary, a list of the main decisions made, and a clear set of action items showing who is responsible for what.
+SummarAI is a web application that turns a meeting recording into a usable written record. You upload an audio file (or paste a transcript), and within a few minutes the app returns three things: a short summary of what the meeting was about, a list of the key points and decisions, and a set of action items showing the task, who owns it, and any deadline that was mentioned.
 
-The system is designed for English input and produces all output in English. It targets a gap left by tools such as Otter.ai or the built-in assistants in Zoom and Microsoft Teams: rather than surfacing a raw transcript, SummarAI interprets the conversation and distils it into three immediately useful artefacts — a concise summary, a decision log, and a task list with owners.
-
----
+The aim was not to produce another transcript. Plenty of tools already do that. SummarAI reads the conversation and pulls out the parts people actually need afterwards — the decisions and the to-dos — and presents them in a form you can drop straight into a project tracker. Summaries can be saved and organised into projects, so a team keeps a searchable history of what was agreed across many meetings.
 
 ## Why it matters
 
-Unproductive meetings cost U.S. businesses an estimated $259 billion per year, according to a 2024 London School of Economics report. A large part of that cost is not the meetings themselves but what happens afterwards: decisions get forgotten, action items go unrecorded, and absent team members miss critical information. Studies show that 54% of employees regularly leave meetings without a clear understanding of the next steps.
-
-SummarAI addresses this directly: it automates the capture of meeting decisions and action items so that nothing important slips through the cracks after the call ends.
-
----
+Meetings take up a large share of any team's week, but most of their value leaks away once the call ends. Decisions get misremembered, action items are never written down, and people who missed the meeting have no quick way to catch up. The cost is rarely the meeting itself; it is the follow-through that doesn't happen. SummarAI targets that gap by capturing the decisions and tasks automatically, so the record exists without anyone having to take minutes by hand.
 
 ## What we found
 
-We tested SummarAI on 40 meeting transcripts spanning English-only. The system performed well on its core task: summaries were consistently coherent and action items were correctly identified in the large majority of cases.
+We evaluated the system on 30 real meetings from the AMI Meeting Corpus, a widely used research dataset of recorded meetings that comes with summaries written by professional human annotators. This let us compare SummarAI's output against a human-made reference for the same meetings, rather than against answers we wrote ourselves.
 
-The main limitation we identified is owner attribution — correctly identifying who is responsible for each action item. When speakers are named explicitly in the conversation ("Ana, can you handle this?"), attribution is reliable. When responsibility is implied rather than stated, the system sometimes leaves the owner blank or makes an incorrect inference. This is a known limitation of working with audio transcripts that do not label speakers, and it is the clearest direction for future improvement.
+The summaries it produced were coherent and stayed on topic. On the action items — the feature we care about most — the system recovered roughly four out of every ten that the human annotators recorded (28 of 66 across the 30 meetings), working end to end from raw audio.
 
----
+The clearest weakness is figuring out *who* owns each task. When a name is said out loud ("Ana, can you take that?"), attribution is reliable. When responsibility is only implied, the system either leaves the owner blank or guesses. This traces back to a known limitation of the underlying transcription, which converts speech to text but does not label who is speaking. It is the single most valuable thing to fix next.
 
-## Bottom line
+On speed, an early version transcribed a 20-minute meeting in about eight minutes; after tuning the transcription settings we brought that down to roughly two minutes, with no measurable loss in quality.
 
-SummarAI demonstrates that a focused AI pipeline can meaningfully reduce the administrative burden of meetings — capturing decisions and tasks automatically from any English-language recording. The proof of concept is functional, the core task is working well, and the failure modes are well-understood and addressable. The most immediate next step is adding speaker identification so that action-item ownership can be assigned reliably without depending on participants being named out loud.
+## Where it stands
+
+SummarAI is a working proof of concept. It does its core job — turning a recording into a summary, decisions, and owned action items — and the places where it falls short are understood rather than mysterious. The most direct next step is adding speaker identification, which would let the system assign ownership reliably without depending on people naming each other out loud.

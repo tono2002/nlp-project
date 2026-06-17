@@ -652,10 +652,13 @@ def build_reflections_combined():
         out, "Individual Reflections", "Individual Reflections",
         "Antonio · Bojana · Jo · Martí · Smaragda",
     )
-    story = [PageBreak()]  # cover on page 1, content from page 2
+    story = []
 
-    for name, data in REFLECTIONS.items():
-        story += reflection_story_for(name, data)
+    for i, (name, data) in enumerate(REFLECTIONS.items()):
+        parts = reflection_story_for(name, data)
+        if i == 0:
+            parts = [p for p in parts if not isinstance(p, PageBreak)]
+        story += parts
 
     doc.build(story, onFirstPage=first, onLaterPages=later)
     print(f"Written: {out}")

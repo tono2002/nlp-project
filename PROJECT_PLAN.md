@@ -4,19 +4,19 @@
 
 ---
 
-## Part 1 — What we do (the work)
+## Part 1: What we do (the work)
 
-1. **Pick & get approval** — choose the idea. ⚠️ The professor must approve the topic *before* we start.
-2. **Research the field** — who else does this, what tools exist, what they get wrong. (Becomes a report section.)
-3. **Build the app (POC)** — a simple working web app: paste text in → get a smart result out. Doesn't need to be pretty or production-ready, just work.
-4. **Build the test set** ⭐ *most important* — create **30–50 examples** by hand: each one is an input + the correct answer *we* decided.
-5. **Measure it** — run the app on all 30–50, count how many it gets right (e.g. "38/50"). This is our proof.
-6. **Analyze failures** — pick **5–10 wrong cases** and explain *why* they failed.
-7. **Write & present** — write it up, make slides, present in class (**20 min + 5 min Q&A**).
+1. **Pick & get approval**: choose the idea. ⚠️ The professor must approve the topic *before* we start.
+2. **Research the field**: who else does this, what tools exist, what they get wrong. (Becomes a report section.)
+3. **Build the app (POC)**: a simple working web app: paste text in → get a smart result out. Doesn't need to be pretty or production-ready, just work.
+4. **Build the test set** ⭐ *most important*, create **30–50 examples** by hand: each one is an input + the correct answer *we* decided.
+5. **Measure it**: run the app on all 30–50, count how many it gets right (e.g. "38/50"). This is our proof.
+6. **Analyze failures**: pick **5–10 wrong cases** and explain *why* they failed.
+7. **Write & present**: write it up, make slides, present in class (**20 min + 5 min Q&A**).
 
 ---
 
-## Part 2 — What we deliver (the submission)
+## Part 2: What we deliver (the submission)
 
 | # | Deliverable | Plain meaning | File in repo |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Plus a short **"Use of AI tools"** section inside the report (how we used LLMs).
 
 ---
 
-## Part 3 — What they grade
+## Part 3: What they grade
 
 1. Is the work technically sound?
 2. **Did we measure it with our OWN data?** ← biggest one

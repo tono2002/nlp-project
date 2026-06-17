@@ -1,8 +1,8 @@
-# SummarAI — Meeting Summarizer
+# SummarAI: Meeting Summarizer
 
 An NLP-powered web app that turns a meeting recording (or transcript) into a **2-sentence summary**, a set of **typed key-takeaway bullets** (decision / note), and **action items** (task · owner · deadline). Summaries can be organised into **projects** and saved.
 
-**Course:** NLP — Group Assignment · **Option 1: Application Development**
+**Course:** NLP, Group Assignment · **Option 1: Application Development**
 **Team:** Antonio · Martí · Bojana · Smaragda · Jo
 
 > See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the simple step-by-step plan.
@@ -22,7 +22,7 @@ You upload a meeting (audio/video file, or an existing transcript). SummarAI:
 2. **Analyses** the transcript with an LLM and returns, in English:
    - a tight **summary** (max 2 sentences),
    - **key takeaways** as short, scannable bullets, each tagged **decision** or **note**,
-   - **action items** — who has to do what, by when (owner/deadline only when actually stated).
+   - **action items**: who has to do what, by when (owner/deadline only when actually stated).
 3. Optionally **saves** the result to a **project** (persisted in Supabase) and shows it in a timeline.
 
 ## 2. Where the NLP is
@@ -31,7 +31,7 @@ The web app is just the interface. The intelligence is in two NLP stages:
 
 | Stage | NLP task | How |
 |---|---|---|
-| Audio → text | **Speech-to-text (ASR)** | `faster-whisper` (`base` model), local CPU. Skipped for `txt` input. |
+| Audio → text | **Speech-to-text (ASR)** | `faster-whisper` (`base.en` model), local CPU. Skipped for `txt` input. |
 | Text → insights | **Summarization + information extraction** | Claude **Haiku 4.5** with a strict JSON schema → summary, typed takeaways, action items. |
 
 ## 3. Justification of need
@@ -40,22 +40,22 @@ Meetings are everywhere and most of their value is lost: people forget decisions
 
 _(Full justification + field review go in the technical report.)_
 
-## 4. Evaluation focus — the part that gets graded ⚠️
+## 4. Evaluation
 
-We must test the system on our **own 30–50 example test set** and report a real score. **This is the biggest open task** (see status below).
+We evaluate the **summarization** stage on **30 real meetings from the AMI Meeting Corpus**, using AMI's **human-written summaries** as the ground truth. There is no manual labeling: we reuse the professional human annotations that ship with the corpus and compare the app's output against them automatically.
 
-- **Primary, measurable target: action-item extraction.** Each test transcript has a known list of "true" action items (task + owner). We measure **precision / recall**: did the app catch the real actions, miss any, or invent fake ones?
-- Secondary: takeaway **type** accuracy (decision vs note) and summary quality (qualitative / ROUGE).
+- **ROUGE-1 / 2 / L** measure how close our output is to the human reference summary.
+- **Action-item coverage** measures how many of the human-annotated action items the app recovers.
 
-Test set, expected outputs, and the eval script live in [data/eval/](data/eval/).
+Result (30 meetings): **ROUGE-1 0.34**, and the system recovers about **42% of the human action items** working end to end from audio. The methodology, script, and full per-meeting results are in [data/eval/](data/eval/).
 
 ## 5. Tech stack (built)
 
-- **Backend:** Python + **FastAPI** ([src/app.py](src/app.py)) — endpoints for processing, projects, and saved summarizations.
-- **Transcription:** [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) `base` model, local, int8.
+- **Backend:** Python + **FastAPI** ([src/app.py](src/app.py)), endpoints for processing, projects, and saved summarizations.
+- **Transcription:** [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) `base.en` model, local, int8.
 - **Analysis:** **Claude Haiku 4.5** via the Anthropic SDK, structured JSON output.
-- **Frontend:** single-page vanilla JS + CSS ([src/static/index.html](src/static/index.html)) — midnight-indigo theme, drag-and-drop, typed takeaway bubbles, action checklist, **collapsible sidebar**, **iPhone-responsive**.
-- **Persistence:** **Supabase** (Postgres) — `projects` + `summarizations` tables ([supabase_schema.sql](supabase_schema.sql)).
+- **Frontend:** single-page vanilla JS + CSS ([src/static/index.html](src/static/index.html)), midnight-indigo theme, drag-and-drop, typed takeaway bubbles, action checklist, **collapsible sidebar**, **iPhone-responsive**.
+- **Persistence:** **Supabase** (Postgres), `projects` + `summarizations` tables ([supabase_schema.sql](supabase_schema.sql)).
 - Run it: see [docs/installation_guide.md](docs/installation_guide.md).
 
 ---
@@ -64,19 +64,19 @@ Test set, expected outputs, and the eval script live in [data/eval/](data/eval/)
 
 ### ✅ Done
 - [x] Functional POC: upload → transcribe → summary + typed takeaways + action items
-- [x] Whisper transcription verified on a real ~20-min `m4a`
+- [x] Whisper transcription verified on real meeting audio; transcription sped up ~3.5x
 - [x] Project management + Supabase persistence + timeline view
 - [x] English-only output, 2-sentence summary, decision/note bubbles
 - [x] Responsive (iPhone) layout + collapsible projects sidebar
-- [x] Technical Report drafted as PDF ([docs/SummarAI_Technical_Report.pdf](docs/SummarAI_Technical_Report.pdf))
+- [x] Custom evaluation on 30 AMI meetings (ROUGE + action-item coverage)
+- [x] Failure-mode analysis (in the technical report)
+- [x] Technical report, executive summary, user manual, installation guide, prompt documentation
 
-### 🔲 To do (priority order)
-1. **Custom evaluation set** (30–50 transcripts + expected action items) and an **eval script** that reports precision/recall → [data/eval/](data/eval/). *Highest impact on the grade.*
-2. **Failure-mode analysis** — document 5–10 cases with hypotheses (e.g. Whisper mishears names like *Bojana → "Janna"*; podcast input correctly yields zero action items).
-3. **Field review** of the meeting-AI / transcription industry (for the report).
-4. Fill the remaining deliverables: **executive summary**, **slides**, reconcile **technical_report.md** with the PDF, **5 individual reflections**, finish **user manual** & **install guide**.
-5. Document the actual system prompt in [prompts/](prompts/).
-6. (Optional) **Deploy** — local Whisper rules out Vercel serverless; Render / Railway / Fly.io fit a long-running FastAPI app.
+### 🔲 To do
+1. Export the technical report to a fresh **PDF** from the corrected markdown.
+2. Build the **presentation slides**.
+3. Each member writes their **individual reflection**.
+4. (Optional) **Deploy**: local Whisper rules out Vercel serverless; Render / Railway / Fly.io fit a long-running FastAPI app.
 
 ---
 
@@ -84,33 +84,33 @@ Test set, expected outputs, and the eval script live in [data/eval/](data/eval/)
 
 | # | Deliverable | File | Status |
 |---|---|---|---|
-| 1 | Technical report (PDF) | [docs/SummarAI_Technical_Report.pdf](docs/SummarAI_Technical_Report.pdf) · [.md](deliverables/technical_report.md) | 🟡 PDF drafted |
-| 2 | One-page executive summary | [deliverables/executive_summary.md](deliverables/executive_summary.md) | 🔲 |
-| 3 | Presentation slides | [deliverables/slides.md](deliverables/slides.md) | 🔲 |
+| 1 | Technical report (PDF) | [.md](deliverables/technical_report.md) | 🟡 content done, export PDF |
+| 2 | One-page executive summary | [deliverables/executive_summary.md](deliverables/executive_summary.md) | ✅ |
+| 3 | Presentation slides | [deliverables/slides.md](deliverables/slides.md) | 🔲 to build |
 | 4 | Code repository | this repo · [src/](src/) | ✅ |
-| 5 | Supporting artifacts (test set, prompts) | [data/eval/](data/eval/) · [prompts/](prompts/) | 🔲 |
-| 6 | Individual reflections (1 per member) | [deliverables/reflections/](deliverables/reflections/) | 🔲 |
-| 7 | User manual *(Option 1)* | [docs/user_manual.md](docs/user_manual.md) | 🟡 partial |
-| 8 | Installation / execution guide *(Option 1)* | [docs/installation_guide.md](docs/installation_guide.md) | 🟡 partial |
+| 5 | Supporting artifacts (eval set, prompts) | [data/eval/](data/eval/) · [prompts/](prompts/) | ✅ |
+| 6 | Individual reflections (1 per member) | [deliverables/reflections/](deliverables/reflections/) | 🔲 each member |
+| 7 | User manual *(Option 1)* | [docs/user_manual.md](docs/user_manual.md) | ✅ |
+| 8 | Installation / execution guide *(Option 1)* | [docs/installation_guide.md](docs/installation_guide.md) | ✅ |
 
-The report must include a **"Use of AI tools"** section describing how we used LLMs.
+The report includes the required **"Use of AI tools"** section (Section 8).
 
 ## 8. Required components (Option 1)
 
-- **Justification of need** — why SummarAI is needed and what existing tools lack. 🟡
-- **Field review** — the meeting-AI / transcription industry: trends, players, gaps. 🔲
-- **Functional system** — a working web app demo (POC). ✅
-- **Custom evaluation** — our 30–50 example test set + quantitative results. 🔲
-- **Failure mode analysis** — 5–10 documented cases where it fails, with hypotheses. 🔲
-- **Reproducible repository** — clean code, clear README, requirements file. ✅
+- **Justification of need**: why SummarAI is needed and what existing tools lack. ✅
+- **Field review**: the meeting-AI / transcription industry, trends, players, gaps. ✅
+- **Functional system**: a working web app demo (POC). ✅
+- **Custom evaluation**: 30 AMI meetings with quantitative results (ROUGE + action-item coverage). ✅
+- **Failure mode analysis**: documented cases with hypotheses. ✅
+- **Reproducible repository**: clean code, clear README, requirements file. ✅
 
 ## 9. Evaluation criteria (rubric)
 
-1. **Technical execution and rigor** — sound methodology, quality code and artifacts.
-2. **Empirical evidence and depth of analysis** — conclusions grounded in our own measurements. ← biggest one
-3. **Originality and critical thinking** — non-trivial insights beyond the obvious.
-4. **Communication** — clear report and presentation.
-5. **Reproducibility and quality of deliverables** — others can follow and reproduce our work.
+1. **Technical execution and rigor**: sound methodology, quality code and artifacts.
+2. **Empirical evidence and depth of analysis**: conclusions grounded in our own measurements. ← biggest one
+3. **Originality and critical thinking**: non-trivial insights beyond the obvious.
+4. **Communication**: clear report and presentation.
+5. **Reproducibility and quality of deliverables**: others can follow and reproduce our work.
 
 ⚠️ Presentation: **20 min + 5 min Q&A.** Every team member must be able to defend any choice made in the project.
 

@@ -1,4 +1,4 @@
-# Technical Report — SummarAI
+# Technical Report: SummarAI
 
 > Final deliverable: export to **PDF** before submission.
 
@@ -6,9 +6,9 @@
 
 ## 1. Introduction
 
-Meetings generate decisions and commitments, but most of that information is lost shortly after the call ends. People rely on informal notes, fragmented memory, or re-watching recordings — none of which scale. SummarAI is a web application that automates this capture: upload an English-language meeting recording and, within minutes, receive a concise written record structured around two outputs: a short prose summary and a set of bullet points covering key takeaways and action items.
+Meetings generate decisions and commitments, but most of that information is lost shortly after the call ends. People rely on informal notes, fragmented memory, or re-watching recordings, none of which scale. SummarAI is a web application that automates this capture: upload an English-language meeting recording and, within minutes, receive a concise written record structured around two outputs: a short prose summary and a set of bullet points covering key takeaways and action items.
 
-The system chains two NLP components. First, a local speech recognition model (Whisper) converts audio to text. Second, a large language model (Claude Haiku 4.5) reads that transcript and produces structured output through a strict JSON schema. The web interface is minimal by design — the value is in the NLP pipeline, not the UI.
+The system chains two NLP components. First, a local speech recognition model (Whisper) converts audio to text. Second, a large language model (Claude Haiku 4.5) reads that transcript and produces structured output through a strict JSON schema. The web interface is minimal by design, the value is in the NLP pipeline, not the UI.
 
 This report describes the motivation, the technical design, an empirical evaluation, and the failure modes we documented during development.
 
@@ -18,13 +18,13 @@ This report describes the motivation, the technical design, an empirical evaluat
 
 Meetings consume a large share of knowledge workers' time, yet much of their value is lost once the call ends. The problem is rarely the discussion itself but the follow-through: decisions made verbally go unrecorded, action items are forgotten, and participants who were absent have no reliable way to catch up. A written record fixes this, but taking accurate minutes by hand is tedious and routinely skipped, which is precisely the gap an automated tool can fill.
 
-Several tools exist to address this — Otter.ai, Fireflies.ai, Zoom AI Companion, and Microsoft Teams Copilot all offer some form of meeting transcription and summary. Their limitations are relevant to this project:
+Several tools exist to address this, Otter.ai, Fireflies.ai, Zoom AI Companion, and Microsoft Teams Copilot all offer some form of meeting transcription and summary. Their limitations are relevant to this project:
 
 - **Cost and access**: all major tools require paid subscriptions; several are tied to specific video-conferencing platforms.
 - **Output quality**: most tools produce a raw transcript or a continuous prose summary. They rarely separate *decisions* from *notes*, and action-item extraction is either absent or unreliable when responsibility is only implied rather than explicitly assigned.
 - **Closed systems**: none of these tools expose the underlying model or prompt, making it impossible to understand or modify their behaviour.
 
-SummarAI addresses the output-quality gap specifically. Its two-output design — a 2-sentence summary plus typed bullet points (decision / note / action item) — forces the model to make an explicit distinction that conversational summaries routinely blur.
+SummarAI addresses the output-quality gap specifically. Its two-output design, a 2-sentence summary plus typed bullet points (decision / note / action item), forces the model to make an explicit distinction that conversational summaries routinely blur.
 
 ---
 
@@ -42,7 +42,7 @@ Commercial ASR alternatives (AssemblyAI, AWS Transcribe, Azure Cognitive Service
 
 LLM-based summarization has largely displaced earlier extractive and abstractive approaches (TextRank, BART, PEGASUS) for long-document tasks. Instruction-tuned models handle long, noisy meeting transcripts better than task-specific fine-tuned models, primarily because they can follow complex, multi-part instructions about output format.
 
-Structured output — enforcing a JSON schema at the API level rather than prompt-engineering the model to emit valid JSON — is a significant recent development. It eliminates parsing failures caused by the model deviating from the expected format, which was a common failure mode in earlier tool-calling approaches.
+Structured output, enforcing a JSON schema at the API level rather than prompt-engineering the model to emit valid JSON, is a significant recent development. It eliminates parsing failures caused by the model deviating from the expected format, which was a common failure mode in earlier tool-calling approaches.
 
 The dominant commercial players (OpenAI GPT-4o, Google Gemini, Anthropic Claude) all now support structured output. Claude Haiku 4.5 was selected for this project on cost grounds: it is the fastest and cheapest model in the Claude 4 family while still following complex structured instructions reliably.
 
@@ -81,23 +81,23 @@ Supported input formats:
 | Audio / video | `.mp4`, `.mp3`, `.wav`, `.m4a`, `.webm`, `.ogg`, `.flac` |
 | Text (skip ASR) | `.txt`, `.md`, `.vtt`, `.srt` |
 
-The 300,000-character transcript limit corresponds to roughly 3–4 hours of dense meeting speech — well beyond the practical use case of a single meeting.
+The 300,000-character transcript limit corresponds to roughly 3–4 hours of dense meeting speech, well beyond the practical use case of a single meeting.
 
 ### 4.2 Two-stage NLP pipeline
 
-**Stage 1 — Speech-to-text.** `faster-whisper` runs locally on CPU using the `base.en` model in `int8` quantization. Voice activity detection (`vad_filter=True`) strips silence before transcription, which both speeds up processing and avoids spurious text segments from quiet segments. The output is a plain string of the full meeting speech.
+**Stage 1, Speech-to-text.** `faster-whisper` runs locally on CPU using the `base.en` model in `int8` quantization. Voice activity detection (`vad_filter=True`) strips silence before transcription, which both speeds up processing and avoids spurious text segments from quiet segments. The output is a plain string of the full meeting speech.
 
-**Stage 2 — Summarization and information extraction.** The transcript is sent to Claude Haiku 4.5 with a system prompt that instructs the model to produce exactly three fields:
+**Stage 2, Summarization and information extraction.** The transcript is sent to Claude Haiku 4.5 with a system prompt that instructs the model to produce exactly three fields:
 
-1. **`summary`** — at most 2 short sentences stating the meeting's purpose and overall outcome.
-2. **`key_takeaways`** — an array of bullet objects, each with a `text` field (≤14 words) and a `type` field: `"decision"` (something agreed or set as policy) or `"note"` (any other important point, fact, or concern). The instruction to be *comprehensive* here is deliberate: the 2-sentence summary omits detail by design, so the takeaways carry all substantive information.
-3. **`action_items`** — concrete tasks with `owner` and `deadline` populated only when actually stated in the meeting; never inferred.
+1. **`summary`**: at most 2 short sentences stating the meeting's purpose and overall outcome.
+2. **`key_takeaways`**: an array of bullet objects, each with a `text` field (≤14 words) and a `type` field: `"decision"` (something agreed or set as policy) or `"note"` (any other important point, fact, or concern). The instruction to be *comprehensive* here is deliberate: the 2-sentence summary omits detail by design, so the takeaways carry all substantive information.
+3. **`action_items`**: concrete tasks with `owner` and `deadline` populated only when actually stated in the meeting; never inferred.
 
 The output schema is enforced at the API level using Claude's `json_schema` output format, which guarantees that every response parses correctly without defensive handling.
 
 ### 4.3 Performance optimization
 
-During development we measured end-to-end processing time on a 20-minute `.m4a` file on a standard laptop CPU. Latency was almost entirely in the ASR stage — Claude Haiku 4.5 returned in 3–6 seconds regardless of transcript length, while Whisper dominated total runtime. We applied four zero-cost changes to the transcription stage only:
+During development we measured end-to-end processing time on a 20-minute `.m4a` file on a standard laptop CPU. Latency was almost entirely in the ASR stage, Claude Haiku 4.5 returned in 3–6 seconds regardless of transcript length, while Whisper dominated total runtime. We applied four zero-cost changes to the transcription stage only:
 
 | Change | Rationale |
 |---|---|
@@ -115,7 +115,7 @@ During development we measured end-to-end processing time on a 20-minute `.m4a` 
 
 This is a **3.5× speedup (≈72% reduction) at zero additional cost**, with no measurable effect on downstream summary quality (near-identical transcript character counts; unchanged model output).
 
-The Whisper model is configurable via the `WHISPER_MODEL` environment variable — `tiny.en` offers even faster throughput at some accuracy cost for live demos on constrained hardware.
+The Whisper model is configurable via the `WHISPER_MODEL` environment variable, `tiny.en` offers even faster throughput at some accuracy cost for live demos on constrained hardware.
 
 ---
 
@@ -123,14 +123,14 @@ The Whisper model is configurable via the `WHISPER_MODEL` environment variable �
 
 ### 5.1 Methodology
 
-Our test set is 30 meetings from the **AMI Meeting Corpus** (Carletta et al., 2006), a widely used research dataset of recorded meetings — these are the same recordings used for the demo (`ES2002a`–`ES2009c`). AMI is annotated with human-written abstractive summaries, each split into `ABSTRACT`, `DECISIONS`, and `ACTIONS` sections. We use those human annotations as ground truth. We did not hand-label our own answers; instead we reuse professional human annotations and built the evaluation around them, which avoids the circularity of grading an LLM against answers we wrote ourselves.
+Our test set is 30 meetings from the **AMI Meeting Corpus** (Carletta et al., 2006), a widely used research dataset of recorded meetings, these are the same recordings used for the demo (`ES2002a`–`ES2009c`). AMI is annotated with human-written abstractive summaries, each split into `ABSTRACT`, `DECISIONS`, and `ACTIONS` sections. We use those human annotations as ground truth. We did not hand-label our own answers; instead we reuse professional human annotations and built the evaluation around them, which avoids the circularity of grading an LLM against answers we wrote ourselves.
 
 We evaluate the two pipeline stages separately. Transcription speed is reported in Section 4.3; here we assess the **summarization** stage. Each meeting's transcript is passed to the summarizer and its output compared against the AMI human reference. We feed our own Whisper transcripts (not AMI's clean reference transcripts) as input, so the scores reflect the full audio-to-summary path, including transcription noise.
 
 We report two automatic metrics, computed by `data/eval/evaluate_rouge.py`:
 
-- **ROUGE-1 / 2 / L (F-measure)** — our full output (summary + takeaways + action items, rendered as text) against the human reference (abstract + decisions + actions). ROUGE is the standard meeting-summarization metric and is explicitly accepted by the assignment.
-- **Action-item coverage (recall)** — the fraction of the human `ACTIONS` sentences that a predicted action item covers, counting a match when ROUGE-L F ≥ 0.30. This measures the headline feature directly against the human action annotations.
+- **ROUGE-1 / 2 / L (F-measure)**: our full output (summary + takeaways + action items, rendered as text) against the human reference (abstract + decisions + actions). ROUGE is the standard meeting-summarization metric and is explicitly accepted by the assignment.
+- **Action-item coverage (recall)**: the fraction of the human `ACTIONS` sentences that a predicted action item covers, counting a match when ROUGE-L F ≥ 0.30. This measures the headline feature directly against the human action annotations.
 
 We report coverage (recall) rather than precision/F1 for action items because AMI's `ACTIONS` list is a curated human selection, not an exhaustive enumeration of every commitment in the meeting; penalising a model action that AMI's annotator simply chose not to list would understate true precision.
 
@@ -145,7 +145,7 @@ Across the 30 meetings:
 | ROUGE-L (F, avg) | 0.148 |
 | Action-item coverage (recall) | 0.424 (28 / 66) |
 
-The summaries are coherent and stay on topic. The ROUGE figures are modest, and the main reason is a deliberate **format mismatch**: our summary is two sentences by design, whereas an AMI reference is a ~200-word, multi-section document. ROUGE rewards n-gram overlap, so a deliberately compressed, differently-structured output is penalised on *form* even when its content is accurate. A ROUGE-1 of 0.34 means our output shares roughly a third of its unigrams with a much longer human summary — a reasonable result for an output that is an order of magnitude shorter. Two further factors push the numbers down honestly: the input is noisy Whisper output rather than clean text, and the model is run zero-shot with no fine-tuning on AMI.
+The summaries are coherent and stay on topic. The ROUGE figures are modest, and the main reason is a deliberate **format mismatch**: our summary is two sentences by design, whereas an AMI reference is a ~200-word, multi-section document. ROUGE rewards n-gram overlap, so a deliberately compressed, differently-structured output is penalised on *form* even when its content is accurate. A ROUGE-1 of 0.34 means our output shares roughly a third of its unigrams with a much longer human summary, a reasonable result for an output that is an order of magnitude shorter. Two further factors push the numbers down honestly: the input is noisy Whisper output rather than clean text, and the model is run zero-shot with no fine-tuning on AMI.
 
 The most informative number is the **42% action-item coverage**: working end to end from raw audio, against strict human annotations, the system recovers roughly four of every ten action items a human annotator recorded.
 
@@ -154,7 +154,7 @@ The most informative number is the **42% action-item coverage**: working end to 
 Two systematic factors explain most of the missed action items:
 
 1. **Representation gap.** AMI annotates actions by *role* ("the industrial designer will work on the design"), while SummarAI extracts them by *name* (the person actually addressed in the conversation). The underlying task is the same, but the surface forms differ enough to fall below the overlap threshold, which accounts for several apparent misses that are not really errors.
-2. **Owner attribution / speaker identity.** Whisper produces no speaker labels. When responsibility is implied rather than named, the model leaves `owner` null rather than guessing — conservative and arguably correct, but it still counts as an incomplete action item. This is the clearest limitation of the system and the most direct target for future work (Section 7).
+2. **Owner attribution / speaker identity.** Whisper produces no speaker labels. When responsibility is implied rather than named, the model leaves `owner` null rather than guessing, conservative and arguably correct, but it still counts as an incomplete action item. This is the clearest limitation of the system and the most direct target for future work (Section 7).
 
 ---
 
@@ -166,7 +166,7 @@ The following cases were documented during development and evaluation.
 
 **2. Whisper mishearing proper nouns.** Names that are uncommon in Whisper's training data are occasionally transcribed incorrectly (e.g. "Bojana" transcribed as "Janna"). Since action-item owners depend on accurate name transcription, this propagates directly into incorrect attribution downstream.
 
-**3. Off-topic or non-meeting audio.** Podcast-style recordings — long monologues, panel discussions, interviews — produce coherent summaries and takeaways but correctly yield zero action items. The system behaves as designed, but users uploading non-meeting content may be confused by the empty action-item list.
+**3. Off-topic or non-meeting audio.** Podcast-style recordings, long monologues, panel discussions, interviews, produce coherent summaries and takeaways but correctly yield zero action items. The system behaves as designed, but users uploading non-meeting content may be confused by the empty action-item list.
 
 **4. Heavily overlapping or noisy audio.** Whisper's VAD filter removes silence effectively, but it does not separate overlapping speakers. In meetings where multiple participants speak simultaneously, the transcript can contain garbled or incomplete sentences, which the LLM then has to interpret from context. Summary quality degrades noticeably in these cases.
 
@@ -180,11 +180,11 @@ The following cases were documented during development and evaluation.
 
 ## 7. Future directions
 
-**Speaker diarization.** The highest-impact improvement would be integrating speaker diarization — automatic labelling of who says what in the transcript. This would directly solve the owner attribution problem and allow the model to assign action items reliably without depending on names being spoken aloud. Libraries such as `pyannote.audio` provide open-source diarization that could be inserted between the Whisper ASR stage and the LLM stage.
+**Speaker diarization.** The highest-impact improvement would be integrating speaker diarization, automatic labelling of who says what in the transcript. This would directly solve the owner attribution problem and allow the model to assign action items reliably without depending on names being spoken aloud. Libraries such as `pyannote.audio` provide open-source diarization that could be inserted between the Whisper ASR stage and the LLM stage.
 
 **Larger Whisper models.** The `base.en` model was chosen for speed. On hardware with more RAM, `small.en` or `medium.en` would improve accuracy on accented speech, domain-specific vocabulary, and noisy audio with minimal changes to the pipeline.
 
-**Confidence and uncertainty signals.** The current system does not communicate uncertainty. A useful extension would be flagging action items or decisions where the model's confidence is low — for example, items extracted from a single ambiguous sentence rather than a clear explicit commitment.
+**Confidence and uncertainty signals.** The current system does not communicate uncertainty. A useful extension would be flagging action items or decisions where the model's confidence is low, for example, items extracted from a single ambiguous sentence rather than a clear explicit commitment.
 
 **Persistent project search.** The current Supabase persistence layer stores full JSON blobs. Adding full-text search over saved summaries and takeaways would make the meeting archive genuinely useful as an organizational memory tool.
 
@@ -197,7 +197,7 @@ The following cases were documented during development and evaluation.
 Claude (Anthropic) was used throughout the project in several capacities:
 
 - **Code generation and debugging**: the FastAPI backend, the structured output schema, and the Supabase integration were iteratively developed with Claude assistance. Claude was particularly useful for generating correct Pydantic models and for debugging JSON schema validation errors.
-- **System prompt engineering**: the system prompt that instructs Claude Haiku was drafted collaboratively — initial versions were generated by Claude Sonnet and then refined through iterative testing on real transcripts. The final decision/note distinction and the instruction to "lose no information" in takeaways emerged from this process.
+- **System prompt engineering**: the system prompt that instructs Claude Haiku was drafted collaboratively, initial versions were generated by Claude Sonnet and then refined through iterative testing on real transcripts. The final decision/note distinction and the instruction to "lose no information" in takeaways emerged from this process.
 - **Documentation**: sections of this report, the user manual, and the installation guide were drafted with Claude assistance and then reviewed and edited by team members.
 - **Transcription** (Whisper): the ASR component is itself an AI model, though it is used as a fixed inference component rather than interactively.
 
@@ -207,9 +207,9 @@ All code, prompts, and documentation were reviewed and edited by team members. N
 
 ## 9. Conclusion
 
-SummarAI demonstrates that a two-stage NLP pipeline — local ASR followed by a structured LLM call — can reliably transform an English meeting recording into an actionable written record. The system is functional, reproducible, and fast enough for practical use on consumer hardware.
+SummarAI demonstrates that a two-stage NLP pipeline, local ASR followed by a structured LLM call, can reliably transform an English meeting recording into an actionable written record. The system is functional, reproducible, and fast enough for practical use on consumer hardware.
 
-The key finding from development was empirical: latency is dominated by transcription, not by the LLM, and a set of zero-cost Whisper optimizations reduced total processing time by 72% with no measurable loss in output quality. The key limitation is owner attribution, which depends on speakers being named explicitly in the meeting — a problem that speaker diarization would directly address.
+The key finding from development was empirical: latency is dominated by transcription, not by the LLM, and a set of zero-cost Whisper optimizations reduced total processing time by 72% with no measurable loss in output quality. The key limitation is owner attribution, which depends on speakers being named explicitly in the meeting, a problem that speaker diarization would directly address.
 
 The two-output design (summary + bullets) proved to be the right abstraction. The 2-sentence summary is useful for quick orientation; the typed bullet list carries the substance. Separating decisions from notes forces the model to make a distinction that is genuinely useful for follow-up and accountability, even if that distinction is occasionally ambiguous in natural speech.
 
@@ -217,12 +217,14 @@ The two-output design (summary + bullets) proved to be the right abstraction. Th
 
 ## References
 
-Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I. (2022). *Robust speech recognition via large-scale weak supervision*. arXiv preprint arXiv:2212.04356.
+Carletta, J., Ashby, S., Bourban, S., Flynn, M., Guillemot, M., Hain, T., Kadlec, J., Karaiskos, V., Kraaij, W., Kronenthal, M., Lathoud, G., Lincoln, M., Lisowska, A., McCowan, I., Post, W., Reidsma, D., & Wellner, P. (2006). *The AMI meeting corpus: A pre-announcement*. In Machine Learning for Multimodal Interaction (MLMI), 28-39.
 
-Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., & Polosukhin, I. (2017). *Attention is all you need*. Advances in Neural Information Processing Systems, 30.
+Lewis, M., Liu, Y., Goyal, N., Ghazvininejad, M., Mohamed, A., Levy, O., Stoyanov, V., & Zettlemoyer, L. (2020). *BART: Denoising sequence-to-sequence pre-training for natural language generation, translation, and comprehension*. Proceedings of ACL 2020.
+
+Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I. (2022). *Robust speech recognition via large-scale weak supervision*. arXiv preprint arXiv:2212.04356.
 
 See, A., Liu, P. J., & Manning, C. D. (2017). *Get to the point: Summarization with pointer-generator networks*. Proceedings of ACL 2017.
 
-Lewis, M., Liu, Y., Goyal, N., Ghahraman, M., Mohamed, A., Levy, O., Stoyanov, V., & Zettlemoyer, L. (2020). *BART: Denoising sequence-to-sequence pre-training for natural language generation, translation, and comprehension*. Proceedings of ACL 2020.
+SYSTRAN. (2023). *faster-whisper* [Computer software]. GitHub. https://github.com/SYSTRAN/faster-whisper
 
-Platek, B., & Polak, P. (2023). *faster-whisper*. GitHub repository. https://github.com/SYSTRAN/faster-whisper
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., & Polosukhin, I. (2017). *Attention is all you need*. Advances in Neural Information Processing Systems, 30.

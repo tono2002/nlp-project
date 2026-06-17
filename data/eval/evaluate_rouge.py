@@ -4,9 +4,9 @@ For each of our 30 transcripts (mapped to its AMI ES meeting), we run the real
 summarizer and compare its output to the human-written AMI abstractive summary.
 
 Two automatic metrics, no manual labeling:
-  1. ROUGE-1/2/L  — our full output (summary + takeaways + actions) vs the AMI
+  1. ROUGE-1/2/L , our full output (summary + takeaways + actions) vs the AMI
      human reference (abstract + decisions + actions). Standard summarization metric.
-  2. Action-item coverage (recall) — fraction of the AMI human ACTION sentences
+  2. Action-item coverage (recall), fraction of the AMI human ACTION sentences
      that a predicted action item covers (ROUGE-L F >= ACTION_THRESHOLD).
 
 Run:  .venv/bin/python data/eval/evaluate_rouge.py

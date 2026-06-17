@@ -1,4 +1,4 @@
-# SummarAI — Installation & Execution Guide
+# SummarAI: Installation & Execution Guide
 
 This guide takes you from a fresh clone to a running app. It assumes you are comfortable in a terminal.
 
@@ -10,7 +10,7 @@ This guide takes you from a fresh clone to a running app. It assumes you are com
 | An Anthropic API key | Used for the summarisation step ([console.anthropic.com](https://console.anthropic.com)) |
 | ~1 GB free disk | For the Whisper transcription model, downloaded on first use |
 
-You do **not** need to install ffmpeg separately — audio decoding is handled by a library bundled with the transcription engine.
+You do **not** need to install ffmpeg separately, audio decoding is handled by a library bundled with the transcription engine.
 
 ## Setup
 
@@ -43,7 +43,7 @@ Then open `.env` and set:
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-That is the only value you need to run the app. (The Supabase variables are optional — they enable saving meetings into projects, and the project ships with working defaults.) Your `.env` is already git-ignored, so the key won't be committed.
+That is the only value you need to run the app. (The Supabase variables are optional, they enable saving meetings into projects, and the project ships with working defaults.) Your `.env` is already git-ignored, so the key won't be committed.
 
 ## Running the app
 
@@ -51,7 +51,7 @@ That is the only value you need to run the app. (The Supabase variables are opti
 uvicorn src.app:app --reload
 ```
 
-Uvicorn prints a local URL — open it in a browser:
+Uvicorn prints a local URL, open it in a browser:
 
 ```
 Uvicorn running on http://127.0.0.1:8000
@@ -104,10 +104,10 @@ This runs SummarAI on the 30 evaluation transcripts and prints ROUGE scores plus
 
 ## Troubleshooting
 
-**`anthropic.AuthenticationError`** — the key in `.env` is missing or wrong. Check it at console.anthropic.com.
+**`anthropic.AuthenticationError`**: the key in `.env` is missing or wrong. Check it at console.anthropic.com.
 
-**`ANTHROPIC_API_KEY is not set`** — you started the server before creating `.env`, or in a different shell. Confirm `.env` exists in the project root and restart.
+**`ANTHROPIC_API_KEY is not set`**: you started the server before creating `.env`, or in a different shell. Confirm `.env` exists in the project root and restart.
 
-**First audio upload hangs for a minute** — it's downloading the Whisper model. Watch the terminal; it only happens once.
+**First audio upload hangs for a minute**: it's downloading the Whisper model. Watch the terminal; it only happens once.
 
-**Transcription feels slow** — set `WHISPER_MODEL=tiny.en` in `.env` for a faster (slightly less accurate) model.
+**Transcription feels slow**: set `WHISPER_MODEL=tiny.en` in `.env` for a faster (slightly less accurate) model.

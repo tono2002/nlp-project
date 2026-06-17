@@ -1,12 +1,12 @@
-# SummarAI — User Manual
+# SummarAI: User Manual
 
 ## What it does
 
 SummarAI takes a meeting recording and gives you back a written record you can actually use. Hand it an audio file or a text transcript, and it returns:
 
-- a **summary** — two sentences on the meeting's purpose and outcome;
-- **key takeaways** — the main points, each tagged as a *decision* or a *note*;
-- **action items** — concrete tasks, with the owner and deadline whenever they were stated.
+- a **summary**: two sentences on the meeting's purpose and outcome;
+- **key takeaways**: the main points, each tagged as a *decision* or a *note*;
+- **action items**: concrete tasks, with the owner and deadline whenever they were stated.
 
 You can save any result into a **project**, so a team builds up a history of summarised meetings in one place.
 
@@ -27,7 +27,7 @@ The screen has a projects panel on the left (which you can hide with the ☰ but
 | Audio / video | `.mp4`, `.mp3`, `.wav`, `.m4a`, `.webm`, `.ogg`, `.flac` |
 | Text transcript | `.txt`, `.md`, `.vtt`, `.srt` |
 
-If you upload audio, the app transcribes it automatically before summarising. Transcription runs locally — the audio never leaves your machine. If you already have the transcript as text, upload that instead and the app skips straight to summarising (faster, and no transcription errors).
+If you upload audio, the app transcribes it automatically before summarising. Transcription runs locally, the audio never leaves your machine. If you already have the transcript as text, upload that instead and the app skips straight to summarising (faster, and no transcription errors).
 
 **2. (Optional) Save it to a project.** Switch on *"Save this meeting to a project?"*, give the meeting a title, and pick a project. The result will be filed there once it finishes. You can create a new project from the panel on the left at any time.
 
@@ -41,9 +41,9 @@ If you upload audio, the app transcribes it automatically before summarising. Tr
 
 **4. Read the results.** Three cards appear:
 
-- **Summary** — a two-sentence overview.
-- **Key takeaways** — short bullets. Green ones are decisions; the others are notes.
-- **Action items** — each task with its owner and deadline shown as small tags. Tick a task off to mark it done.
+- **Summary**: a two-sentence overview.
+- **Key takeaways**: short bullets. Green ones are decisions; the others are notes.
+- **Action items**: each task with its owner and deadline shown as small tags. Tick a task off to mark it done.
 
 If the meeting had no real action items (for example, an informational briefing), the list will say so rather than inventing tasks.
 

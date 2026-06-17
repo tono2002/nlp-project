@@ -51,8 +51,6 @@ That is the only value you need to run the app. (The Supabase variables are opti
 uvicorn src.app:app --reload
 ```
 
-> A hosted version is already live at **<https://nlp-project-three-pink.vercel.app/>** if you just want to use the app without installing anything.
-
 Uvicorn prints a local URL, open it in a browser:
 
 ```

@@ -620,18 +620,12 @@ REFLECTIONS = {
 }
 
 
-def build_reflection(name, data):
-    out = Path(data["pdf"])
-    doc, first, later = make_doc(
-        out, f"Individual Reflection — {name.capitalize()}",
-        f"Individual Reflection",
-        name.capitalize(),
-    )
+def reflection_story_for(name, data):
+    """Return story elements for one person (no cover, starts with a page break)."""
     story = [PageBreak()]
-
     story.append(Paragraph(f"Individual Reflection — {name.capitalize()}", S["h1"]))
     story.append(rule())
-    story.append(Spacer(1, 0.2*cm))
+    story.append(Spacer(1, 0.1*cm))
     story.append(Paragraph("My Contributions", S["h1"]))
     story.append(rule())
 
@@ -649,6 +643,19 @@ def build_reflection(name, data):
                     story.append(Paragraph(f"<b>{sub_title}:</b> {text}", S["bullet"]))
                 else:
                     story.append(Paragraph(text, S["body"]))
+    return story
+
+
+def build_reflections_combined():
+    out = Path("deliverables/reflections/all_reflections.pdf")
+    doc, first, later = make_doc(
+        out, "Individual Reflections", "Individual Reflections",
+        "Antonio · Bojana · Jo · Martí · Smaragda",
+    )
+    story = [PageBreak()]  # cover on page 1, content from page 2
+
+    for name, data in REFLECTIONS.items():
+        story += reflection_story_for(name, data)
 
     doc.build(story, onFirstPage=first, onLaterPages=later)
     print(f"Written: {out}")
@@ -658,6 +665,5 @@ if __name__ == "__main__":
     build_executive_summary()
     build_user_manual()
     build_installation_guide()
-    for name, data in REFLECTIONS.items():
-        build_reflection(name, data)
+    build_reflections_combined()
     print("\nAll PDFs generated.")

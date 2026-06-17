@@ -16,7 +16,7 @@ This report describes the motivation, the technical design, an empirical evaluat
 
 ## 2. Justification of need
 
-Unproductive or poorly followed-up meetings cost U.S. businesses an estimated $259 billion per year (London School of Economics, 2024). A large share of that cost is post-meeting: decisions made verbally go unrecorded, action items are forgotten, and absent participants have no reliable way to catch up. Studies consistently show that a majority of employees leave meetings without a clear understanding of the next steps.
+Meetings consume a large share of knowledge workers' time, yet much of their value is lost once the call ends. The problem is rarely the discussion itself but the follow-through: decisions made verbally go unrecorded, action items are forgotten, and participants who were absent have no reliable way to catch up. A written record fixes this, but taking accurate minutes by hand is tedious and routinely skipped, which is precisely the gap an automated tool can fill.
 
 Several tools exist to address this — Otter.ai, Fireflies.ai, Zoom AI Companion, and Microsoft Teams Copilot all offer some form of meeting transcription and summary. Their limitations are relevant to this project:
 

@@ -14,7 +14,7 @@ The app works in English.
 
 ## Getting started
 
-Open the app in a browser. If you are running it locally, follow the [installation guide](installation_guide.md) and then go to `http://localhost:8000`. No account or sign-in is needed.
+The easiest way is the live app at **<https://nlp-project-three-pink.vercel.app/>**. Open it in any browser, no install and no sign-in needed. If you prefer to run it on your own machine, follow the [installation guide](installation_guide.md) and open `http://localhost:8000`.
 
 The screen has a projects panel on the left (which you can hide with the ☰ button) and the summariser in the middle.
 

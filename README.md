@@ -4,15 +4,22 @@
 
 ### Turn any meeting recording into a summary, decisions, and owned action items.
 
+### [&nbsp; ▶ &nbsp; Try the Live App &nbsp;](https://nlp-project-three-pink.vercel.app/)
+
+[![Live Demo](https://img.shields.io/badge/%E2%96%B6%20LIVE%20APP-Open%20in%20browser-4f46e5?style=for-the-badge&logo=vercel&logoColor=white)](https://nlp-project-three-pink.vercel.app/)
+
 ![Option 1](https://img.shields.io/badge/Assignment-Option%201%3A%20Application-4f46e5)
 ![Python](https://img.shields.io/badge/Python-3.9-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Whisper](https://img.shields.io/badge/Whisper-base.en-6366f1)
 ![Claude](https://img.shields.io/badge/Claude-Haiku%204.5-8b5cf6)
 
-![SummarAI interface](assets/landing.png)
+<a href="https://nlp-project-three-pink.vercel.app/"><img src="assets/landing.png" alt="SummarAI interface, click to open the live app"></a>
 
 </div>
+
+> ### 🌐 Live app: **<https://nlp-project-three-pink.vercel.app/>**
+> No install needed. Open it in any browser and try it right away.
 
 ---
 
@@ -78,7 +85,11 @@ Working end to end from raw audio, the system recovers about four in ten of the 
 | Frontend | Single-page vanilla JavaScript and CSS ([`src/static/index.html`](src/static/index.html)) |
 | Persistence | Supabase (Postgres) |
 
-## Run it locally
+## Try it
+
+**The fastest way is the live app: [nlp-project-three-pink.vercel.app](https://nlp-project-three-pink.vercel.app/)**. Nothing to install.
+
+To run it locally instead:
 
 ```bash
 git clone https://github.com/tono2002/nlp-project.git
@@ -95,6 +106,7 @@ Open `http://localhost:8000`, drop in a recording, and click Summarise. The firs
 
 | Deliverable | Where |
 |---|---|
+| Live app | <https://nlp-project-three-pink.vercel.app/> |
 | Technical report | [deliverables/technical_report.md](deliverables/technical_report.md) |
 | Executive summary (one page) | [deliverables/executive_summary.md](deliverables/executive_summary.md) |
 | Presentation slides | [deliverables/slides.md](deliverables/slides.md) |

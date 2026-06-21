@@ -46,6 +46,14 @@ Structured output, enforcing a JSON schema at the API level rather than prompt-e
 
 The dominant commercial players (OpenAI GPT-4o, Google Gemini, Anthropic Claude) all now support structured output. Claude Haiku 4.5 was selected for this project on cost grounds: it is the fastest and cheapest model in the Claude 4 family while still following complex structured instructions reliably.
 
+### 3.3 Retrieval-Augmented Generation for meeting archives
+
+Retrieval-Augmented Generation (RAG) augments a language model's response with documents retrieved from an external index rather than relying solely on the model's parametric knowledge (Lewis et al., 2020). In the context of meeting assistants, RAG enables longitudinal queries across a project's full meeting history — something that a per-meeting summariser cannot provide.
+
+The dominant approach uses dense vector retrieval: a document is embedded into a high-dimensional space and stored; at query time, the query is embedded in the same space and the most similar documents are retrieved via approximate nearest-neighbour search. `pgvector` (Supabase, 2023) is an open-source PostgreSQL extension that adds native vector types and distance operators, enabling vector search within an existing relational database without an external vector store.
+
+Asymmetric embedding — using different task types for queries versus documents — is important for retrieval quality. Models trained with asymmetric contrastive objectives (e.g. Gemini embedding-001, Google, 2024) optimise the query and document representation functions separately, reflecting the linguistic asymmetry between a short conversational question and a longer structured document. Using the wrong task type degrades cosine similarity scores and retrieval ranking in practice.
+
 ---
 
 ## 4. System description
@@ -72,6 +80,27 @@ User uploads file
                     ▼                        ▼
               Summary (≤ 2 sentences)   Bullet points
                                      (key takeaways + action items)
+                                             │
+                              (if saved to project)
+                                             ▼
+                              Gemini embedding-001 (1536 dims)
+                                             │
+                                             ▼
+                              Supabase / pgvector (embedding column)
+                                             │
+                              ┌──────────────┘
+                              │  RAG retrieval path
+                              ▼
+                     User question → embed (retrieval_query)
+                              │
+                              ▼
+                     match_summarizations() — top-3 by cosine sim
+                              │
+                              ▼
+                     Claude Haiku 4.5 (RAG system prompt)
+                              │
+                              ▼
+                     Grounded answer + source citations
 ```
 
 Supported input formats:
@@ -116,6 +145,43 @@ During development we measured end-to-end processing time on a 20-minute `.m4a` 
 This is a **3.5× speedup (≈72% reduction) at zero additional cost**, with no measurable effect on downstream summary quality (near-identical transcript character counts; unchanged model output).
 
 The Whisper model is configurable via the `WHISPER_MODEL` environment variable, `tiny.en` offers even faster throughput at some accuracy cost for live demos on constrained hardware.
+
+
+### 4.4 RAG layer — natural-language query over the meeting archive
+
+Once a summarisation result is saved to a project, SummarAI automatically embeds the record and indexes it for semantic retrieval. This enables a second interaction mode: the user types a natural-language question in the **Ask about this project** panel and receives a grounded, cited answer drawn from the project's meeting history.
+
+#### Indexing path (runs on every save)
+
+When `POST /api/summarizations` is called, the backend flattens the full record — meeting title, two-sentence summary, all key takeaways, and all action items — into a single text string using `build_summary_text()`. This string is embedded using the Google Gemini `embedding-001` model with `task_type="retrieval_document"`, producing a 1536-dimensional dense vector. The vector is stored in a new `embedding vector(1536)` column in the `summarizations` table via the `pgvector` PostgreSQL extension.
+
+The Supabase schema (`supabase_schema_rag.sql`) includes:
+
+- `CREATE EXTENSION IF NOT EXISTS vector` — enables pgvector.
+- `ALTER TABLE summarizations ADD COLUMN embedding vector(1536)` — adds the vector column.
+- An HNSW index (`vector_cosine_ops`) for fast approximate cosine-distance search.
+- A custom SQL function `match_summarizations(query_embedding, match_project_id, match_count)` that returns the top-k rows by cosine similarity for a given project, called via the Supabase RPC interface.
+
+If `GEMINI_API_KEY` is absent, embedding is skipped silently and the save still succeeds; the record is retrievable via back-fill once the key is added.
+
+#### Retrieval path (runs on every question)
+
+`POST /api/projects/{project_id}/ask` accepts a `question` string and an optional `top_k` parameter (default 3).
+
+1. **Embed the question.** The question is embedded using `task_type="retrieval_query"`. This asymmetry is deliberate: Gemini `embedding-001` was trained on (query, document) pairs and optimises the two embedding types differently. Using the wrong task type for either role measurably degrades cosine similarity scores and therefore retrieval ranking.
+2. **Retrieve.** `match_summarizations()` returns the top-k meetings for the project ranked by cosine similarity to the query vector.
+3. **Augment and generate.** The retrieved meetings are serialised as a structured context block (meeting title, date, summary, takeaways, action items) and passed to Claude Haiku 4.5 with a dedicated RAG system prompt. The prompt instructs the model to answer from the provided context only, to cite meeting titles for every claim, and to state explicitly when the answer is not present rather than hallucinating.
+4. **Return.** The response includes both the text answer and a `sources` array (meeting ID, title, date, cosine similarity score), which the frontend renders as clickable source chips.
+
+#### Design choices
+
+**Gemini over OpenAI embeddings.** `text-embedding-3-small` (OpenAI) would require a paid key and introduce a second commercial dependency. Gemini `embedding-001` is free within the API's daily quota, integrates with the existing `google-genai` SDK, and natively supports asymmetric task types.
+
+**1536 dimensions.** Gemini `embedding-001` produces up to 3072 dimensions by default; we truncate to 1536 using the `output_dimensionality` parameter to stay within Supabase's pgvector index limit. 1536 dimensions is sufficient for a meeting-scale corpus and affordable in storage terms.
+
+**HNSW index.** For a corpus of tens to hundreds of meetings, a flat scan would also be fast enough. The HNSW index is included so the system remains performant as the archive grows without schema changes. We use HNSW rather than IVFFlat because Supabase's version of pgvector caps IVFFlat at 2000 dimensions, and our 1536-dimensional vectors require HNSW.
+
+**Grounded generation.** The RAG system prompt does not ask Claude to use its prior knowledge. The model's role in this path is purely synthesis and formatting, not knowledge retrieval. This eliminates the hallucination risk that would arise from asking the model to recall facts about meetings it was never shown.
 
 ---
 
@@ -186,7 +252,7 @@ The following cases were documented during development and evaluation.
 
 **Confidence and uncertainty signals.** The current system does not communicate uncertainty. A useful extension would be flagging action items or decisions where the model's confidence is low, for example, items extracted from a single ambiguous sentence rather than a clear explicit commitment.
 
-**Persistent project search.** The current Supabase persistence layer stores full JSON blobs. Adding full-text search over saved summaries and takeaways would make the meeting archive genuinely useful as an organizational memory tool.
+**Agentic meeting assistant.** The RAG layer implemented in section 4.4 is a natural foundation for an agentic extension: an agent that monitors a calendar, retrieves meeting recordings automatically, cross-references action items from previous meetings via the RAG index, and alerts owners of overdue tasks. This would apply the agentic AI techniques introduced in course module 08 on top of the retrieval infrastructure already in place.
 
 **Deployment.** The local Whisper model rules out serverless hosting (Vercel, Lambda) due to memory and runtime constraints. A long-running FastAPI server on Render, Railway, or Fly.io would work without changes to the application code.
 
@@ -199,7 +265,9 @@ Claude (Anthropic) was used throughout the project in several capacities:
 - **Code generation and debugging**: the FastAPI backend, the structured output schema, and the Supabase integration were iteratively developed with Claude assistance. Claude was particularly useful for generating correct Pydantic models and for debugging JSON schema validation errors.
 - **System prompt engineering**: the system prompt that instructs Claude Haiku was drafted collaboratively, initial versions were generated by Claude Sonnet and then refined through iterative testing on real transcripts. The final decision/note distinction and the instruction to "lose no information" in takeaways emerged from this process.
 - **Documentation**: sections of this report, the user manual, and the installation guide were drafted with Claude assistance and then reviewed and edited by team members.
+- **RAG generation**: the `/api/projects/{id}/ask` endpoint calls Claude Haiku 4.5 as the augmented generation step, grounded on retrieved meeting summaries.
 - **Transcription** (Whisper): the ASR component is itself an AI model, though it is used as a fixed inference component rather than interactively.
+- **Embeddings** (Gemini): the RAG indexing and retrieval paths use the Gemini `embedding-001` model for dense vector representation of both documents and queries.
 
 All code, prompts, and documentation were reviewed and edited by team members. No output was used without human review.
 
@@ -207,11 +275,13 @@ All code, prompts, and documentation were reviewed and edited by team members. N
 
 ## 9. Conclusion
 
-SummarAI demonstrates that a two-stage NLP pipeline, local ASR followed by a structured LLM call, can reliably transform an English meeting recording into an actionable written record. The system is functional, reproducible, and fast enough for practical use on consumer hardware.
+SummarAI demonstrates that a two-stage NLP pipeline — local ASR followed by a structured LLM call — can reliably transform an English meeting recording into an actionable written record, and that the resulting structured archive can be made queryable via a RAG layer built on top of the existing database. The system is functional, reproducible, and fast enough for practical use on consumer hardware.
 
-The key finding from development was empirical: latency is dominated by transcription, not by the LLM, and a set of zero-cost Whisper optimizations reduced total processing time by 72% with no measurable loss in output quality. The key limitation is owner attribution, which depends on speakers being named explicitly in the meeting, a problem that speaker diarization would directly address.
+The key finding from the core pipeline was empirical: latency is dominated by transcription, not by the LLM, and a set of zero-cost Whisper optimisations reduced total processing time by 72% with no measurable loss in output quality. The key limitation of the summarisation stage is owner attribution, which depends on speakers being named explicitly in the meeting — a problem that speaker diarisation would directly address.
 
-The two-output design (summary + bullets) proved to be the right abstraction. The 2-sentence summary is useful for quick orientation; the typed bullet list carries the substance. Separating decisions from notes forces the model to make a distinction that is genuinely useful for follow-up and accountability, even if that distinction is occasionally ambiguous in natural speech.
+The RAG layer adds a qualitatively different capability: the ability to ask questions across the full meeting history of a project and receive grounded, cited answers without manually searching through saved summaries. The asymmetric embedding approach — `retrieval_document` at index time and `retrieval_query` at query time — and the instruction to cite sources and decline when the context is insufficient are the two design decisions that most directly determine the quality of RAG outputs.
+
+The two-output design (summary + bullets) proved to be the right abstraction for the core pipeline. The 2-sentence summary is useful for quick orientation; the typed bullet list carries the substance. Separating decisions from notes forces the model to make a distinction that is genuinely useful for follow-up and accountability, even if that distinction is occasionally ambiguous in natural speech.
 
 ---
 
@@ -226,5 +296,9 @@ Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I. (20
 See, A., Liu, P. J., & Manning, C. D. (2017). *Get to the point: Summarization with pointer-generator networks*. Proceedings of ACL 2017.
 
 SYSTRAN. (2023). *faster-whisper* [Computer software]. GitHub. https://github.com/SYSTRAN/faster-whisper
+
+Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., Küttler, H., Lewis, M., Yih, W.-T., Rocktäschel, T., Riedel, S., & Kiela, D. (2020). *Retrieval-augmented generation for knowledge-intensive NLP tasks*. Advances in Neural Information Processing Systems, 33.
+
+Supabase. (2023). *pgvector: Open-source vector similarity search for Postgres* [Computer software]. GitHub. https://github.com/pgvector/pgvector
 
 Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., & Polosukhin, I. (2017). *Attention is all you need*. Advances in Neural Information Processing Systems, 30.

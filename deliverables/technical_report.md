@@ -1,7 +1,5 @@
 # Technical Report: SummarAI
 
-> Final deliverable: export to **PDF** before submission.
-
 ---
 
 ## 1. Introduction
